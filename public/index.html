@@ -26,7 +26,7 @@
         <div class="table-actions">
           <p id="hint" class="muted">Connecting…</p>
           <div class="action-buttons">
-            <button id="leave" class="secondary" type="button" hidden>Leave</button>
+            <button id="leave" class="secondary" type="button" hidden>Leave table</button>
             <button id="start" type="button" hidden disabled>Start game <span aria-hidden="true">→</span></button>
             <button id="reset" class="secondary" type="button" hidden>End game / Reset</button>
           </div>
@@ -71,5 +71,10 @@
       </aside>
       <noscript>Enable JavaScript to join the game.</noscript>
     </main>
+    <dialog id="player-menu" aria-labelledby="player-menu-title">
+      <div class="player-menu-heading"><h2 id="player-menu-title">Manage player</h2><button id="close-player-menu" class="secondary" type="button" aria-label="Close player menu">×</button></div>
+      <div class="player-menu-actions"><button id="transfer-player" type="button">Transfer host</button><button id="kick-player" class="secondary kick" type="button">Kick from table</button></div>
+      <p id="player-menu-hint" class="muted"></p>
+    </dialog>
   </body>
 </html>

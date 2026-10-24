@@ -80,7 +80,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
       hostId,
       kicked: kicked.has(token),
       connectedCount: [...players.values()].filter(connected).length,
-      players: [...players.values()].map(p => ({ id: p.id, name: p.name, connected: connected(p) })),
+      players: [...players.values()].map(p => ({ id: p.id, name: p.name, connected: connected(p), npc: Boolean(p.npc) })),
       me: me ? { id: me.id, name: me.name, role: me.role ?? null, team: me.role ? ROLE_INFO[me.role].team : null, information: startingInformation(me, [...players.values()]) } : null,
     };
   };
@@ -144,7 +144,6 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
         }
         if (path === '/api/host' || path === '/api/kick') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can manage players.' });
-          if (demo) return send(409, { error: 'NPC seats are fixed for this demo.' });
           if (phase !== 'lobby') return send(409, { error: 'The roster is locked for this game.' });
           let data;
           try { data = JSON.parse(body); } catch { return send(400, { error: 'Choose a player.' }); }
@@ -153,6 +152,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           const [targetToken, player] = target;
           if (player.id === me.id) return send(400, { error: 'Choose another player. Use Leave lobby to leave.' });
           if (path === '/api/host') {
+            if (player.npc) return send(409, { error: 'Choose a human player to host.' });
             if (!connected(player)) return send(409, { error: 'Choose a connected player to host.' });
             hostId = player.id;
           } else {

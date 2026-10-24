@@ -15,6 +15,22 @@ let editorKey;
 let savedConfig;
 let informationVisible = false;
 let privateIdentity;
+let selectedPlayerId;
+const playerMenu = $('#player-menu');
+
+function renderPlayerMenu() {
+  if (!playerMenu.open) return;
+  const player = state.players.find(p => p.id === selectedPlayerId);
+  if (!player || state.phase !== 'lobby' || state.me?.id !== state.hostId || player.id === state.me?.id) {
+    playerMenu.close();
+    return;
+  }
+  $('#player-menu-title').textContent = player.name;
+  $('#kick-player').disabled = busy || !online;
+  $('#transfer-player').disabled = busy || !online || !player.connected || player.npc;
+  $('#player-menu-hint').textContent = player.npc ? 'NPCs cannot host.' : !player.connected ? 'Player is offline.' : '';
+}
+
 
 function readDraft() {
   return { mode: $('#mode').value, counts: Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, Number(document.getElementById(`role-${role}`).value)])) };
@@ -123,17 +139,19 @@ function render() {
       const badge = document.createElement('span'); badge.className = 'merlin-badge'; badge.textContent = 'merlin?'; meta.append(badge);
     }
     row.append(meta);
-    if (!state.demo && !started && state.me?.id === state.hostId && player.id !== state.me.id) {
-      const controls = document.createElement('div'); controls.className = 'player-controls';
-      for (const [label, endpoint] of [['Make host', '/api/host'], ['Kick', '/api/kick']]) {
-        const control = document.createElement('button');
-        control.type = 'button'; control.className = endpoint === '/api/kick' ? 'secondary kick' : 'secondary'; control.textContent = label;
-        control.setAttribute('aria-label', `${label}: ${player.name}`);
-        control.disabled = busy || !online || (endpoint === '/api/host' && !player.connected);
-        control.addEventListener('click', () => update(endpoint, { playerId: player.id }));
-        controls.append(control);
-      }
-      row.append(controls);
+    row.dataset.playerId = player.id;
+    if (!started && isHost && player.id !== state.me.id) {
+      const manage = document.createElement('button');
+      manage.type = 'button'; manage.className = 'player-card-button';
+      manage.setAttribute('aria-label', `Manage ${player.name}`);
+      manage.setAttribute('aria-haspopup', 'dialog');
+      manage.addEventListener('click', () => {
+        selectedPlayerId = player.id;
+        playerMenu.showModal();
+        renderPlayerMenu();
+      });
+      const mark = document.createElement('span'); mark.className = 'manage-mark'; mark.textContent = '⋯'; mark.setAttribute('aria-hidden', 'true');
+      row.append(mark, manage);
     }
     return row;
   });
@@ -165,6 +183,7 @@ function render() {
     : state.kicked ? 'Removed by host. Join again if a seat is open.'
     : state.connectedCount === state.capacity ? 'Table full' : 'Join to take a seat';
   renderSetup(started);
+  renderPlayerMenu();
 }
 
 async function request(path, body) {
@@ -201,6 +220,20 @@ async function update(path = '/api/heartbeat', body) {
     render();
     timer = setTimeout(() => update(), 3000);
   }
+}
+$('#close-player-menu').addEventListener('click', () => playerMenu.close());
+playerMenu.addEventListener('click', event => { if (event.target === playerMenu) playerMenu.close(); });
+playerMenu.addEventListener('close', () => {
+  const card = [...document.querySelectorAll('#players > li')].find(row => row.dataset.playerId === selectedPlayerId);
+  card?.querySelector('button')?.focus();
+  selectedPlayerId = null;
+});
+for (const [selector, endpoint] of [['#transfer-player', '/api/host'], ['#kick-player', '/api/kick']]) {
+  $(selector).addEventListener('click', async () => {
+    if (busy || !selectedPlayerId) return;
+    await update(endpoint, { playerId: selectedPlayerId });
+    if (playerMenu.open) playerMenu.close();
+  });
 }
 $('#role-toggle').addEventListener('click', () => {
   if (!state?.me?.role) return;

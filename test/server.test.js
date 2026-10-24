@@ -50,7 +50,7 @@ test('exactly six joined players, one start, correct private roles and locked ro
     const { data } = await c.call();
     assert.equal(data.phase, 'started');
     assigned.push(data.me.role);
-    for (const p of data.players) assert.deepEqual(Object.keys(p).sort(), ['connected', 'id', 'name']);
+    for (const p of data.players) assert.deepEqual(Object.keys(p).sort(), ['connected', 'id', 'name', 'npc']);
     assert.equal(JSON.stringify(data).includes(c.cookie.split('=')[1]), false);
     assert.equal((await c.call('/api/leave')).status, 409);
     assert.equal((await client(c.cookie).call()).data.me.role, data.me.role);
@@ -251,7 +251,7 @@ test('all eight roles receive exactly their allowed starting knowledge, and no o
     else if (me.role === 'Percival') expected = all.filter(p => ['Merlin', 'Morgana'].includes(p.role));
     else if (evil.includes(me.role) && me.role !== 'Oberon') expected = all.filter(p => evil.includes(p.role) && p.role !== 'Oberon' && p.id !== me.id);
     assert.deepEqual(me.information.players, expected.map(p => ({ id: p.id, name: p.name })));
-    for (const p of states[i].players) assert.deepEqual(Object.keys(p).sort(), ['connected', 'id', 'name']);
+    for (const p of states[i].players) assert.deepEqual(Object.keys(p).sort(), ['connected', 'id', 'name', 'npc']);
     assert.deepEqual((await client(clients[i].cookie).call()).data.me.information, me.information);
   }
   assert.equal((await client().call()).data.me, null);
@@ -323,7 +323,7 @@ test('opt-in Percival demo has three persistent NPCs and reserves Percival for l
   assert.equal((await player.call()).data.capacity, 5);
   assert.equal((await player.call('/api/config', edited)).status, 200);
   assert.equal((await client().call('/api/config', edited)).status, 403);
-  assert.equal((await player.call('/api/kick', { playerId: initial.players[0].id })).status, 409);
+  assert.equal((await player.call('/api/host', { playerId: initial.players[0].id })).status, 409);
   const started = (await player.call('/api/start')).data;
   assert.equal(started.me.role, 'Percival');
   assert.equal(started.me.team, 'Resistance');
@@ -428,4 +428,22 @@ test('a disconnected host is replaced during a game so remaining players can res
   assert.equal((await host.call('/api/reset')).status, 403);
   assert.equal((await guest.call('/api/reset')).status, 200);
   assert.equal((await guest.call()).data.players.length, 5);
+});
+
+
+test('demo host can kick NPCs, transfer to humans, and all humans can leave the lobby', async t => {
+  const { client } = await setup(t, { demo: true });
+  const host = client();
+  const joined = (await host.call('/api/join', { name: 'laze' })).data;
+  const npc = joined.players.find(p => p.npc);
+  assert.equal((await host.call('/api/kick', { playerId: npc.id })).status, 200);
+  const guest = client();
+  const guestState = (await guest.call('/api/join', { name: 'Guest' })).data;
+  assert.equal((await host.call('/api/host', { playerId: guestState.me.id })).status, 200);
+  assert.equal((await host.call('/api/leave')).data.me, null);
+  assert.equal((await guest.call('/api/leave')).data.me, null);
+  const final = (await client().call()).data;
+  assert.equal(final.hostId, null);
+  assert.equal(final.connectedCount, 2);
+  assert.ok(final.players.every(p => p.npc));
 });
