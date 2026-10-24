@@ -294,7 +294,7 @@ test('standard Percival without Morgana sees Merlin; custom repeated roles work 
   assert.deepEqual(roles, { Assassin: 2, Morgana: 3, Resistance: 5, Merlin: 2, Percival: 3 });
 });
 
-test('opt-in Merlin demo has four persistent NPCs and reserves Merlin for laze', async t => {
+test('opt-in Morgana demo has four persistent NPCs and reserves Morgana for laze', async t => {
   const { client, advance } = await setup(t, { demo: true });
   const player = client();
   const initial = (await player.call()).data;
@@ -312,11 +312,11 @@ test('opt-in Merlin demo has four persistent NPCs and reserves Merlin for laze',
   assert.equal((await player.call('/api/config', joined.config)).status, 409);
   assert.equal((await player.call('/api/kick', { playerId: initial.players[0].id })).status, 409);
   const started = (await player.call('/api/start')).data;
-  assert.equal(started.me.role, 'Merlin');
-  assert.equal(started.me.team, 'Good');
-  assert.equal(started.me.information.players.length, 2);
+  assert.equal(started.me.role, 'Morgana');
+  assert.equal(started.me.team, 'Evil');
+  assert.equal(started.me.information.players.length, 1);
   assert.ok(started.me.information.players.every(p => p.name.startsWith('NPC ')));
-  assert.equal((await client(player.cookie).call()).data.me.role, 'Merlin');
+  assert.equal((await client(player.cookie).call()).data.me.role, 'Morgana');
   assert.equal((await client().call()).data.me, null);
 });
 

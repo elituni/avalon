@@ -45,7 +45,7 @@ function validateDraft() {
 }
 function renderSetup(started) {
   const counts = totals(state.config);
-  $('#setup-summary').textContent = `${state.demo ? 'Merlin demo' : state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Good} Good / ${counts.Evil} Evil`;
+  $('#setup-summary').textContent = `${state.demo ? 'Morgana demo' : state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Good} Good / ${counts.Evil} Evil`;
   $('#setup-roles').replaceChildren(...Object.entries(state.config.counts).filter(([, n]) => n).map(([role, n]) => {
     const chip = document.createElement('span'); chip.className = 'role-chip'; chip.dataset.team = ROLE_INFO[role].team;
     const amount = document.createElement('b'); amount.textContent = `×${n}`;
@@ -104,7 +104,7 @@ function render() {
       const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
     }
     if (knownEvil.has(player.id)) {
-      const badge = document.createElement('span'); badge.className = 'evil-badge'; badge.textContent = 'Known Evil'; meta.append(badge);
+      const badge = document.createElement('span'); badge.className = 'evil-badge'; badge.textContent = 'Spy'; meta.append(badge);
     }
     row.append(meta);
     if (!state.demo && !started && state.me?.id === state.hostId && player.id !== state.me.id) {
