@@ -43,7 +43,8 @@ test('exactly six joined players, one start, correct private roles and locked ro
   assert.equal((await outsider.call('/api/join', { name: 'Seventh' })).status, 409);
   const starts = await Promise.all(players.map(c => c.call('/api/start')));
   assert.equal(starts.filter(r => r.status === 200).length, 1);
-  assert.equal(starts.filter(r => r.status === 409).length, 5);
+  assert.equal(starts.filter(r => r.status === 403).length, 5);
+  assert.equal((await players[0].call('/api/start')).status, 409);
   const assigned = [];
   for (const c of players) {
     const { data } = await c.call();
@@ -375,4 +376,56 @@ test('smaller demo setups release NPC seats and allow starting without Percival'
   assert.equal(saved.data.capacity, 1);
   assert.equal(saved.data.players.length, 1);
   assert.equal((await host.call('/api/start')).data.me.role, 'Spy');
+});
+
+test('only host can start/reset; resetting preserves seats and config but removes private information', async t => {
+  const { client } = await setup(t);
+  const host = client();
+  await host.call('/api/join', { name: 'Host' });
+  const guests = [];
+  for (let i = 0; i < 5; i++) {
+    const guest = client(); await guest.call('/api/join', { name: `Guest ${i}` }); guests.push(guest);
+  }
+  assert.equal((await guests[0].call('/api/start')).status, 403);
+  const starts = await Promise.all([host.call('/api/start'), host.call('/api/start')]);
+  assert.deepEqual(starts.map(r => r.status).sort(), [200, 409]);
+  const before = (await host.call()).data;
+  assert.equal((await guests[0].call('/api/reset')).status, 403);
+  assert.equal((await client().call('/api/reset')).status, 403);
+  const reset = await host.call('/api/reset');
+  assert.equal(reset.status, 200);
+  assert.equal(reset.data.phase, 'lobby');
+  assert.deepEqual(reset.data.config, before.config);
+  assert.deepEqual(reset.data.players, before.players);
+  assert.equal(reset.data.hostId, before.hostId);
+  for (const player of [host, ...guests]) {
+    const state = (await player.call()).data;
+    assert.equal(state.me.role, null);
+    assert.equal(state.me.team, null);
+    assert.equal(state.me.information, null);
+  }
+  assert.equal((await host.call('/api/reset')).status, 409);
+  assert.equal((await host.call('/api/config', before.config)).status, 200);
+  const restarted = await host.call('/api/start');
+  assert.equal(restarted.status, 200);
+  assert.equal(restarted.data.gameNumber, before.gameNumber + 1);
+});
+
+test('a disconnected host is replaced during a game so remaining players can reset', async t => {
+  const { client, advance } = await setup(t, { demo: true });
+  const host = client();
+  await host.call('/api/join', { name: 'laze' });
+  const config = (await host.call()).data.config;
+  config.counts.Resistance = 1;
+  await host.call('/api/config', config);
+  const guest = client(); await guest.call('/api/join', { name: 'Guest' });
+  await host.call('/api/start');
+  advance(14000);
+  await guest.call('/api/heartbeat');
+  advance(1001);
+  const state = (await guest.call()).data;
+  assert.equal(state.hostId, state.me.id);
+  assert.equal((await host.call('/api/reset')).status, 403);
+  assert.equal((await guest.call('/api/reset')).status, 200);
+  assert.equal((await guest.call()).data.players.length, 5);
 });

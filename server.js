@@ -52,6 +52,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
     }
   }
   let phase = 'lobby';
+  let gameNumber = 0;
   let config = preset(demo ? 5 : 6);
   if (demo) {
     // Four-seat UI demo only; normal setups still require at least five players.
@@ -62,7 +63,6 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
   const kicked = new Set();
   const connected = player => player.npc || now() - player.lastSeen < graceMs;
   const updateHost = () => {
-    if (phase !== 'lobby') return;
     const current = [...players.values()].find(p => p.id === hostId);
     if (!current || !connected(current)) {
       hostId = [...players.values()].find(p => !p.npc && connected(p))?.id ?? null;
@@ -73,6 +73,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
     const me = players.get(token);
     return {
       phase,
+      gameNumber,
       demo,
       config,
       capacity: totals(config).total,
@@ -95,7 +96,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
       const path = req.url.split('?')[0];
       if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true });
       if (path.startsWith('/api/')) {
-        const methods = { '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/leave': 'POST', '/api/host': 'POST', '/api/kick': 'POST', '/api/config': 'POST' };
+        const methods = { '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/reset': 'POST', '/api/leave': 'POST', '/api/host': 'POST', '/api/kick': 'POST', '/api/config': 'POST' };
         if (!methods[path]) return send(404, { error: 'Not found' });
         if (req.method !== methods[path]) {
           res.setHeader('Allow', methods[path]);
@@ -179,7 +180,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           config = { mode: proposed.mode, counts: { ...proposed.counts } };
         }
         if (path === '/api/start') {
-          if (!me) return send(403, { error: 'Join the lobby first.' });
+          if (!me || me.id !== hostId) return send(403, { error: 'Only the host can start the game.' });
           if (phase !== 'lobby') return send(409, { error: 'The game has already started.' });
           if (players.size !== totals(config).total || [...players.values()].some(p => !connected(p))) return send(409, { error: `Exactly ${totals(config).total} connected players are needed.` });
           const shuffled = Object.entries(config.counts).flatMap(([role, count]) => Array(count).fill(role));
@@ -194,6 +195,13 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
             if (laze && percival) [laze.role, percival.role] = [percival.role, laze.role];
           }
           phase = 'started';
+          gameNumber += 1;
+        }
+        if (path === '/api/reset') {
+          if (!me || me.id !== hostId) return send(403, { error: 'Only the host can reset the game.' });
+          if (phase !== 'started') return send(409, { error: 'The game is already in the lobby.' });
+          for (const player of players.values()) delete player.role;
+          phase = 'lobby';
         }
         return send(200, snapshot(token));
       }

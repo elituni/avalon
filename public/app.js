@@ -3,6 +3,7 @@ import { ROLE_INFO, preset, totals, validateConfig } from '/roles.js';
 const $ = selector => document.querySelector(selector);
 const form = $('#join-form');
 const start = $('#start');
+const reset = $('#reset');
 const leave = $('#leave');
 const connection = $('#connection');
 const feedback = $('#feedback');
@@ -72,7 +73,8 @@ function render() {
   if (!state) return;
   const joined = Boolean(state.me);
   const started = state.phase === 'started';
-  const identity = state.me?.role ? `${state.me.id}:${state.me.role}` : null;
+  const isHost = joined && state.me.id === state.hostId;
+  const identity = state.me?.role ? `${state.gameNumber}:${state.me.id}:${state.me.role}` : null;
   if (identity !== privateIdentity) {
     privateIdentity = identity;
     informationVisible = false;
@@ -81,8 +83,10 @@ function render() {
   form.hidden = joined || started;
   if (state.demo && !joined && !$('#name').value) $('#name').value = 'laze';
   $('#join').disabled = busy || !online || state.connectedCount >= state.capacity;
-  start.hidden = !joined || started;
+  start.hidden = !isHost || started;
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
+  reset.hidden = !isHost || !started;
+  reset.disabled = busy || !online;
   leave.hidden = !joined || started;
   leave.disabled = busy || !online;
   const knowsSpy = informationVisible && (state.me?.role === 'Merlin' || state.me?.team === 'Spy');
@@ -157,7 +161,7 @@ function render() {
   }
   $('#hint').textContent = started
     ? joined ? 'Game started' : 'Game in progress'
-    : joined ? state.connectedCount === state.capacity ? 'Ready to start' : `Waiting for ${state.capacity - state.connectedCount} player${state.connectedCount === state.capacity - 1 ? '' : 's'}`
+    : joined ? state.connectedCount === state.capacity ? (isHost ? 'Ready to start' : 'Waiting for host to start') : `Waiting for ${state.capacity - state.connectedCount} player${state.connectedCount === state.capacity - 1 ? '' : 's'}`
     : state.kicked ? 'Removed by host. Join again if a seat is open.'
     : state.connectedCount === state.capacity ? 'Table full' : 'Join to take a seat';
   renderSetup(started);
@@ -221,6 +225,7 @@ form.addEventListener('submit', event => {
   update('/api/join', { name: $('#name').value });
 });
 start.addEventListener('click', () => update('/api/start'));
+reset.addEventListener('click', () => update('/api/reset'));
 leave.addEventListener('click', () => update('/api/leave'));
 $('#role-guide').replaceChildren(...Object.entries(ROLE_INFO).flatMap(([role, info]) => {
   const term = document.createElement('dt'); term.textContent = `${role} · ${info.team}`;

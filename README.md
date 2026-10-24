@@ -10,17 +10,17 @@ Use Node.js 22 or newer:
 npm start
 ```
 
-Open http://localhost:3000. Enter a unique display name and join. The host chooses the role distribution; its total determines the number of seats. Every seat must be filled by a connected player to start. Any joined player may start. The default remains six players: two Resistance and one each of Merlin, Morgana, Assassin, and Percival. Each browser receives its own role and only the starting information that role is allowed to see.
+Open http://localhost:3000. Enter a unique display name and join. The host chooses the role distribution; its total determines the number of seats. Every seat must be filled by a connected player to start. Only the host may start. The default remains six players: two Resistance and one each of Merlin, Morgana, Assassin, and Percival. Each browser receives its own role and only the starting information that role is allowed to see.
 
-The first player to join becomes the host (viewing the page alone does not take a seat). The host can transfer hosting to another connected player or kick someone from the lobby. These controls are enforced by the server and unavailable after roles are dealt. Any joined player can still start when all configured seats are connected.
+The first player to join becomes the host (viewing the page alone does not take a seat). The host can transfer hosting to another connected player or kick someone from the lobby. These controls are enforced by the server and unavailable after roles are dealt. Only the host sees Start game, enabled when all configured seats are connected. During the game the host can select **End game / Reset** to return everyone to the lobby, preserving seats and setup while clearing roles and private information. Each new game starts with information concealed.
 
-If the host leaves or exceeds the 15-second disconnect grace period, hosting passes to the earliest joined connected player. Reconnecting does not reclaim hosting. Kicking removes a seat from all of that player’s tabs; it is not a ban, and the player may explicitly join again if space is available.
+If the host leaves or exceeds the 15-second disconnect grace period, hosting passes to the earliest joined connected human player, including during a game so reset remains available. Reconnecting does not reclaim hosting. Kicking removes a seat from all of that player’s tabs; it is not a ban, and the player may explicitly join again if space is available.
 
 A browser session cookie identifies a player across tabs and refreshes. To test six players, use six separate browser profiles or devices (ordinary tabs share one seat). Private windows from the same browser may also share cookies.
 
 Browsers send heartbeats every three seconds. A player is disconnected after 15 seconds without one, including when a device sleeps or the browser suspends background tabs. Before starting, disconnected seats can be reclaimed by new players. Players can also explicitly leave the lobby. After starting, the roster is locked and reconnecting restores the original role.
 
-State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, assassination action, or in-app new-game/reset control yet. A session identifies a browser, not a verified person.
+State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, or assassination action yet. A session identifies a browser, not a verified person.
 
 ```sh
 npm test
@@ -47,7 +47,7 @@ Rules checked against the original [Avalon rulebook PDF](https://avalon.fun/pdfs
 
 The default listener is `0.0.0.0:3000`. Override with `HOST` and `PORT`. The current IP-based deployment uses HTTP; private role responses are access-controlled by session but transport is not encrypted. HTTPS should be added before relying on role secrecy over untrusted networks.
 
-The API provides `GET /api/state`, `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all eight role counts (see `public/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
+The API provides `GET /api/state`, `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/reset`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all eight role counts (see `public/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
 
 ## Deploy to the Droplet
 
