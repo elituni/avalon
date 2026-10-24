@@ -1,4 +1,4 @@
-# Avalon six-player lobby
+# Avalon lobby and private role reveal
 
 A shared lobby and private role reveal using Node.js and plain browser JavaScript. No dependencies or build step.
 
@@ -10,9 +10,9 @@ Use Node.js 22 or newer:
 npm start
 ```
 
-Open http://localhost:3000. Enter a unique display name and join. Exactly six connected players are required to start; any joined player may start. The server randomly deals two Resistance roles and one each of Merlin, Morgana, Assassin, and Percival. Each browser receives only its own role.
+Open http://localhost:3000. Enter a unique display name and join. The host chooses the role distribution; its total determines the number of seats. Every seat must be filled by a connected player to start. Any joined player may start. The default remains six players: two Resistance and one each of Merlin, Morgana, Assassin, and Percival. Each browser receives its own role and only the starting information that role is allowed to see.
 
-The first player to join becomes the host (viewing the page alone does not take a seat). The host can transfer hosting to another connected player or kick someone from the lobby. These controls are enforced by the server and unavailable after roles are dealt. Any joined player can still start when all six are connected.
+The first player to join becomes the host (viewing the page alone does not take a seat). The host can transfer hosting to another connected player or kick someone from the lobby. These controls are enforced by the server and unavailable after roles are dealt. Any joined player can still start when all configured seats are connected.
 
 If the host leaves or exceeds the 15-second disconnect grace period, hosting passes to the earliest joined connected player. Reconnecting does not reclaim hosting. Kicking removes a seat from all of that player’s tabs; it is not a ban, and the player may explicitly join again if space is available.
 
@@ -20,19 +20,34 @@ A browser session cookie identifies a player across tabs and refreshes. To test 
 
 Browsers send heartbeats every three seconds. A player is disconnected after 15 seconds without one, including when a device sleeps or the browser suspends background tabs. Before starting, disconnected seats can be reclaimed by new players. Players can also explicitly leave the lobby. After starting, the roster is locked and reconnecting restores the original role.
 
-State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, role-specific knowledge, or in-app new-game/reset control yet. A session identifies a browser, not a verified person.
+State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, assassination action, or in-app new-game/reset control yet. A session identifies a browser, not a verified person.
 
 ```sh
 npm test
 ```
 
-Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, fresh-server reset, host permissions, transfers, kicks, and automatic host succession.
+Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, fresh-server reset, host permissions, transfers, kicks, automatic host succession, configuration validation, all eight roles’ private starting information, and custom 15-player games.
+
+## Role setup and starting information
+
+The host edits role counts in **At this table**, then selects **Save role setup**. All players can see the saved distribution; nobody can see the assignments before starting. Presets cover 5–10 players plus the custom 15-player example. The server rejects changes by non-hosts, changes after starting, and reductions below the current roster size.
+
+Standard setup uses the original game’s team counts: 5 players = 3 Good / 2 Evil; 6 = 4/2; 7 = 4/3; 8 = 5/3; 9 = 6/3; 10 = 6/4. Our standard preset requires one Merlin and one Assassin, and at most one each of Percival, Morgana, Mordred, and Oberon. With five players and Percival, include Morgana or Mordred. Custom mode supports 5–15 players, repeated special roles, optional Merlin/Assassin, and any split with at least one player on each side. Custom distributions are house rules, not an official balanced format.
+
+- Merlin sees Evil players except Mordred, including Oberon, without exact roles.
+- Percival sees Merlin and Morgana together without labels distinguishing them. If only one of those role types exists, the public distribution makes the reveal unambiguous.
+- Assassin, Morgana, Mordred, and ordinary Minions see their Evil teammates except Oberon, without exact roles.
+- Resistance and Oberon receive no other-player identities. Oberon still knows their own Evil alignment.
+
+Repeated special roles in custom mode each receive the same visibility rules. A custom Percival sees all Merlin/Morgana candidates; Merlins do not learn other Merlins. Candidate lists follow public seating order rather than sorting by secret role. Information persists through refreshes and reconnects. The host has no special access to anyone else’s role or knowledge.
+
+Rules checked against the original [Avalon rulebook PDF](https://avalon.fun/pdfs/rules.pdf) and its [text transcription](https://www.rulespal.com/resistance-avalon/rulebook). This scope covers the original roles and opening reveal, not expansion characters or gameplay powers such as Lady of the Lake.
 
 ## Configuration
 
 The default listener is `0.0.0.0:3000`. Override with `HOST` and `PORT`. The current IP-based deployment uses HTTP; private role responses are access-controlled by session but transport is not encrypted. HTTPS should be added before relying on role secrecy over untrusted networks.
 
-The API provides `GET /api/state`, `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, and `/api/leave`. Join accepts `{ "name": "Alice" }`. Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
+The API provides `GET /api/state`, `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all eight role counts (see `public/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
 
 ## Deploy to the Droplet
 

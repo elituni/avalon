@@ -191,3 +191,105 @@ test('kick updates readiness and host controls cannot change a started roster', 
   for (const action of ['/api/kick', '/api/host']) assert.equal((await host.c.call(action, { playerId: target })).status, 409);
   assert.equal((await host.c.call()).data.players.length, 6);
 });
+
+test('only the host can configure roles; invalid setups and shrinking an occupied lobby are rejected', async t => {
+  const { preset, emptyCounts, validateConfig } = await import('../public/roles.js');
+  const { client } = await setup(t);
+  const host = client();
+  await host.call('/api/join', { name: 'Host' });
+  const guest = client();
+  await guest.call('/api/join', { name: 'Guest' });
+  assert.equal((await guest.call('/api/config', preset(5))).status, 403);
+  assert.equal((await client().call('/api/config', preset(5))).status, 403);
+  for (const size of [5, 6, 7, 8, 9, 10, 15]) {
+    assert.equal(validateConfig(preset(size)), null);
+    assert.equal((await host.call('/api/config', preset(size))).data.capacity, size);
+  }
+  const invalid = [null, { mode: 'other', counts: emptyCounts() }, { ...preset(), counts: {} }];
+  for (const value of [-1, 1.5, '1', 16, null]) {
+    const config = preset(); config.counts.Merlin = value; invalid.push(config);
+  }
+  const extra = preset(); extra.counts.FakeRole = 0; invalid.push(extra);
+  const wrongBalance = preset(); wrongBalance.counts.Resistance--; wrongBalance.counts.Minion++; invalid.push(wrongBalance);
+  const duplicate = preset(10); duplicate.counts.Percival++; duplicate.counts.Resistance--; invalid.push(duplicate);
+  const missing = preset(); missing.counts.Merlin = 0; missing.counts.Resistance++; invalid.push(missing);
+  const weakFive = preset(5); weakFive.counts.Morgana = 0; weakFive.counts.Minion++; invalid.push(weakFive);
+  const sixteen = preset(15); sixteen.counts.Resistance++; invalid.push(sixteen);
+  const oneTeam = { mode: 'custom', counts: { ...emptyCounts(), Resistance: 5 } }; invalid.push(oneTeam);
+  for (const config of invalid) {
+    assert.equal((await host.call('/api/config', config)).status, 400);
+    assert.equal((await host.call()).data.capacity, 15);
+  }
+  await host.call('/api/config', preset());
+  for (let i = 0; i < 4; i++) await client().call('/api/join', { name: `Additional ${i}` });
+  assert.equal((await host.call('/api/config', preset(5))).status, 409);
+  await host.call('/api/start');
+  assert.equal((await host.call('/api/config', preset(10))).status, 409);
+});
+
+test('all eight roles receive exactly their allowed starting knowledge, and no observer gets it', async t => {
+  const { emptyCounts } = await import('../public/roles.js');
+  const { client } = await setup(t);
+  const host = client();
+  await host.call('/api/join', { name: 'Host' });
+  const counts = { ...emptyCounts(), Resistance: 3, Merlin: 1, Percival: 1, Assassin: 1, Morgana: 1, Mordred: 1, Oberon: 1, Minion: 1 };
+  assert.equal((await host.call('/api/config', { mode: 'custom', counts })).status, 200);
+  const clients = [host];
+  for (let i = 1; i < 10; i++) {
+    const c = client(); await c.call('/api/join', { name: `Player ${i}` }); clients.push(c);
+  }
+  assert.equal((await host.call('/api/start')).status, 200);
+  const states = await Promise.all(clients.map(async c => (await c.call()).data));
+  const all = states.map(s => s.me);
+  for (let i = 0; i < clients.length; i++) {
+    const me = all[i];
+    const evil = ['Minion', 'Assassin', 'Morgana', 'Mordred', 'Oberon'];
+    assert.equal(me.team, evil.includes(me.role) ? 'Evil' : 'Good');
+    let expected = [];
+    if (me.role === 'Merlin') expected = all.filter(p => evil.includes(p.role) && p.role !== 'Mordred');
+    else if (me.role === 'Percival') expected = all.filter(p => ['Merlin', 'Morgana'].includes(p.role));
+    else if (evil.includes(me.role) && me.role !== 'Oberon') expected = all.filter(p => evil.includes(p.role) && p.role !== 'Oberon' && p.id !== me.id);
+    assert.deepEqual(me.information.players, expected.map(p => ({ id: p.id, name: p.name })));
+    for (const p of states[i].players) assert.deepEqual(Object.keys(p).sort(), ['connected', 'id', 'name']);
+    assert.deepEqual((await client(clients[i].cookie).call()).data.me.information, me.information);
+  }
+  assert.equal((await client().call()).data.me, null);
+});
+
+test('standard Percival without Morgana sees Merlin; custom repeated roles work for 15 players', async t => {
+  const { preset } = await import('../public/roles.js');
+  const { client } = await setup(t);
+  const host = client();
+  await host.call('/api/join', { name: 'Host' });
+  const config = preset(6); config.counts.Morgana = 0; config.counts.Minion = 1;
+  assert.equal((await host.call('/api/config', config)).status, 200);
+  const clients = [host];
+  for (let i = 1; i < 6; i++) { const c = client(); await c.call('/api/join', { name: `P${i}` }); clients.push(c); }
+  await host.call('/api/start');
+  const states = await Promise.all(clients.map(async c => (await c.call()).data));
+  const merlin = states.find(s => s.me.role === 'Merlin').me;
+  assert.equal(states.find(s => s.me.role === 'Percival').me.information.heading, 'Merlin');
+  assert.deepEqual(states.find(s => s.me.role === 'Percival').me.information.players, [{ id: merlin.id, name: merlin.name }]);
+
+  const fresh = await setup(t);
+  const players = [fresh.client()];
+  await players[0].call('/api/join', { name: 'Host' });
+  await players[0].call('/api/config', preset(15));
+  for (let i = 1; i < 15; i++) {
+    const c = fresh.client();
+    assert.equal((await c.call('/api/join', { name: `P${i}` })).status, 200);
+    players.push(c);
+    if (i === 13) assert.equal((await players[0].call('/api/start')).status, 409);
+  }
+  assert.equal((await fresh.client().call('/api/join', { name: 'Overflow' })).status, 409);
+  assert.equal((await players[0].call('/api/start')).status, 200);
+  const roles = {};
+  for (const c of players) {
+    const { me } = (await c.call()).data;
+    roles[me.role] = (roles[me.role] || 0) + 1;
+    if (me.role === 'Percival') assert.equal(me.information.players.length, 5);
+    if (me.role === 'Merlin') assert.equal(me.information.players.length, 5);
+    if (['Assassin', 'Morgana'].includes(me.role)) assert.equal(me.information.players.length, 4);
+  }
+  assert.deepEqual(roles, { Assassin: 2, Morgana: 3, Resistance: 5, Merlin: 2, Percival: 3 });
+});

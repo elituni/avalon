@@ -6,14 +6,14 @@
     <meta name="theme-color" content="#132b25">
     <title>Avalon · Game night</title>
     <link rel="stylesheet" href="/style.css">
-    <script src="/app.js" defer></script>
+    <script src="/app.js" type="module"></script>
   </head>
   <body>
     <header><a class="wordmark" href="/">AVALON<span class="star" aria-hidden="true">✦</span></a><span class="edition">THE FIRST QUEST / 001</span></header>
     <main>
       <p class="eyebrow">A SEAT AT THE SAME TABLE</p>
-      <h1>Gather your six.<br>Keep your secret.</h1>
-      <p class="intro">Join your friends at the table. When all six are connected, start the game to discover your role.</p>
+      <h1>Gather your allies.<br>Keep your secret.</h1>
+      <p class="intro">Join your friends at the table. The host chooses the roles. When every seat is filled, start to discover your role and secret information.</p>
       <section class="counter-card" aria-label="Game lobby">
         <div class="card-top"><span id="lobby-count">0 / 6 CONNECTED</span><span id="connection" role="status" data-state="connecting">Connecting…</span></div>
         <form id="join-form" hidden>
@@ -21,11 +21,36 @@
           <input id="name" name="name" maxlength="24" required autocomplete="nickname" placeholder="What should we call you?">
           <button id="join" type="submit" disabled>Join game <span aria-hidden="true">＋</span></button>
         </form>
+        <section class="setup-panel" aria-label="Role setup">
+          <h2>At this table</h2>
+          <p id="setup-summary" class="feedback"></p>
+          <p id="setup-roles" class="footnote"></p>
+          <form id="setup-form" hidden>
+            <label for="preset">Load a preset</label>
+            <select id="preset">
+              <option value="">Choose a preset…</option>
+              <option value="5">5 players</option><option value="6">6 players</option>
+              <option value="7">7 players</option><option value="8">8 players</option>
+              <option value="9">9 players</option><option value="10">10 players</option>
+              <option value="15">15 players · custom example</option>
+            </select>
+            <label for="mode">Setup mode</label>
+            <select id="mode"><option value="standard">Standard · 5–10 players</option><option value="custom">Custom · 5–15 players</option></select>
+            <p class="footnote">Standard uses the usual team balance and one of each special role. Custom allows repeated roles and different team sizes.</p>
+            <div id="role-inputs"></div>
+            <p id="setup-validation" class="feedback" role="status"></p>
+            <button id="save-setup" type="submit">Save role setup</button>
+          </form>
+        </section>
         <ul id="players" aria-label="Players"></ul>
         <div id="role-panel" hidden>
           <p class="eyebrow">FOR YOUR EYES ONLY</p>
           <h2 id="role"></h2>
           <p id="team"></p>
+          <p id="role-description" class="footnote"></p>
+          <h3 id="information-heading"></h3>
+          <p id="information-explanation" class="footnote"></p>
+          <ul id="information-players" aria-label="Your starting information"></ul>
           <p class="footnote">Keep your role secret. Your assignment stays the same if you refresh.</p>
         </div>
         <button id="start" type="button" hidden disabled>Start game <span aria-hidden="true">→</span></button>
@@ -33,7 +58,7 @@
         <p id="feedback" class="feedback" role="status"></p>
         <button id="leave" class="secondary" type="button" hidden>Leave lobby</button>
       </section>
-      <p class="footnote">Six players. Four loyal to the Resistance. Two working against it.</p>
+      <p class="footnote">Your role and starting information are for your eyes only.</p>
       <noscript>Enable JavaScript to join the game.</noscript>
     </main>
     <footer><span>A small beginning for game night.</span><span>AVALON PROTOTYPE</span></footer>

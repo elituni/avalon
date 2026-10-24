@@ -50,3 +50,13 @@ input:focus-visible { outline: 3px solid #a78950; outline-offset: 2px; }
 .player-controls { display: flex; gap: 8px; width: 100%; }
 .player-controls .secondary { width: auto; margin: 0; padding: 0 12px; min-height: 34px; }
 #players li { flex-wrap: wrap; }
+.setup-panel { margin-top: 24px; padding: 18px 0; border-top: 1px solid #e7e9df; border-bottom: 1px solid #e7e9df; text-align: left; }
+.setup-panel h2 { margin: 0; font: 25px Georgia, serif; }
+.setup-panel .footnote { margin: 12px 0; }
+select { width: 100%; padding: 12px; border: 1px solid #b8c4b8; border-radius: 8px; background: #fff; color: #132b25; font: inherit; margin-bottom: 14px; }
+.role-input-row { display: grid; grid-template-columns: 1fr 75px; gap: 0 12px; align-items: center; border-top: 1px solid #e7e9df; padding: 12px 0; }
+.role-input-row label, .role-input-row input { margin: 0; }
+.role-input-row .footnote { grid-column: 1 / -1; margin: 6px 0 0; font-size: 11px; }
+#information-players { padding: 0; list-style: none; }
+#information-players li { padding: 9px; border-top: 1px solid #c4cebd; overflow-wrap: anywhere; }
+#information-heading { margin-top: 26px; font-size: 16px; }

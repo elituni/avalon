@@ -1,3 +1,5 @@
+import { ROLE_INFO, preset, totals, validateConfig } from '/roles.js';
+
 const $ = selector => document.querySelector(selector);
 const form = $('#join-form');
 const start = $('#start');
@@ -8,16 +10,66 @@ let state;
 let busy = false;
 let timer;
 let online = false;
+let editorKey;
+let savedConfig;
+
+function readDraft() {
+  return { mode: $('#mode').value, counts: Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, Number(document.getElementById(`role-${role}`).value)])) };
+}
+function fillEditor(config) {
+  $('#mode').value = config.mode;
+  $('#role-inputs').replaceChildren(...Object.entries(ROLE_INFO).map(([role, info]) => {
+    const row = document.createElement('div');
+    row.className = 'role-input-row';
+    const label = document.createElement('label');
+    label.htmlFor = `role-${role}`;
+    label.textContent = `${role} · ${info.team}`;
+    const input = document.createElement('input');
+    input.type = 'number'; input.min = '0'; input.max = '15'; input.step = '1'; input.required = true;
+    input.id = `role-${role}`; input.value = config.counts[role];
+    const description = document.createElement('p');
+    description.className = 'footnote'; description.textContent = info.description;
+    row.append(label, input, description);
+    return row;
+  }));
+}
+function validateDraft() {
+  if (!state || $('#setup-form').hidden) return;
+  const draft = readDraft();
+  const error = validateConfig(draft);
+  const counts = totals(draft);
+  const overcrowded = counts.total < state.players.length;
+  const dirty = JSON.stringify(draft) !== savedConfig;
+  $('#setup-validation').textContent = error || (overcrowded ? 'Remove players before reducing the number of seats.' : `${counts.total} seats · ${counts.Good} Good / ${counts.Evil} Evil${dirty ? ' · Unsaved changes' : ' · Saved'}`);
+  $('#save-setup').disabled = busy || !online || !dirty || Boolean(error) || overcrowded;
+  if (dirty) start.disabled = true;
+}
+function renderSetup(started) {
+  const counts = totals(state.config);
+  $('#setup-summary').textContent = `${state.config.mode === 'custom' ? 'Custom rules' : 'Standard setup'} · ${counts.total} players · ${counts.Good} Good / ${counts.Evil} Evil`;
+  $('#setup-roles').textContent = Object.entries(state.config.counts).filter(([, n]) => n).map(([role, n]) => `${n} ${role}`).join(' · ');
+  const host = state.me?.id === state.hostId;
+  $('#setup-form').hidden = !host || started;
+  const key = JSON.stringify([state.hostId, state.config]);
+  if (key !== editorKey) {
+    fillEditor(state.config);
+    savedConfig = JSON.stringify(readDraft());
+    editorKey = key;
+    $('#preset').value = '';
+  }
+  for (const input of $('#setup-form').querySelectorAll('input, select')) input.disabled = busy || !online;
+  validateDraft();
+}
 
 function render() {
   if (!state) return;
   const joined = Boolean(state.me);
   const started = state.phase === 'started';
-  $('#lobby-count').textContent = `${state.connectedCount} / 6 CONNECTED`;
+  $('#lobby-count').textContent = `${state.connectedCount} / ${state.capacity} CONNECTED`;
   form.hidden = joined || started;
-  $('#join').disabled = busy || !online || state.connectedCount >= 6;
+  $('#join').disabled = busy || !online || state.connectedCount >= state.capacity;
   start.hidden = !joined || started;
-  start.disabled = busy || !online || state.connectedCount !== 6;
+  start.disabled = busy || !online || state.connectedCount !== state.capacity;
   leave.hidden = !joined || started;
   leave.disabled = busy || !online;
   $('#players').replaceChildren(...state.players.map(player => {
@@ -47,12 +99,26 @@ function render() {
   }));
   $('#role-panel').hidden = !state.me?.role;
   $('#role').textContent = state.me?.role || '';
-  $('#team').textContent = ['Morgana', 'Assassin'].includes(state.me?.role) ? 'You are on the Evil team.' : 'You are on the Resistance team.';
+  $('#team').textContent = state.me?.team ? `You are on the ${state.me.team} team.` : '';
+  $('#role-description').textContent = ROLE_INFO[state.me?.role]?.description || '';
+  const information = state.me?.information;
+  $('#information-heading').textContent = information?.heading || '';
+  $('#information-explanation').textContent = information?.explanation || '';
+  $('#information-players').replaceChildren(...(information?.players || []).map(player => {
+    const row = document.createElement('li');
+    row.textContent = player.name;
+    return row;
+  }));
+  if (information && information.players.length === 0) {
+    const row = document.createElement('li'); row.textContent = 'No players revealed.';
+    $('#information-players').append(row);
+  }
   $('#hint').textContent = started
     ? joined ? 'Roles assigned. The roster is locked.' : 'This game has started. The roster is locked.'
-    : joined ? state.connectedCount === 6 ? 'Everyone is here. Any player can start.' : `Waiting for ${6 - state.connectedCount} more connected player${state.connectedCount === 5 ? '' : 's'}.`
+    : joined ? state.connectedCount === state.capacity ? 'Everyone is here. Any player can start.' : `Waiting for ${state.capacity - state.connectedCount} more connected player${state.connectedCount === state.capacity - 1 ? '' : 's'}.`
     : state.kicked ? 'The host removed you from the lobby. You can join again if there is a seat.'
-    : state.connectedCount === 6 ? 'The lobby is full.' : 'Enter your name to take a seat.';
+    : state.connectedCount === state.capacity ? 'The lobby is full.' : 'Enter your name to take a seat.';
+  renderSetup(started);
 }
 
 async function request(path, body) {
@@ -90,6 +156,18 @@ async function update(path = '/api/heartbeat', body) {
     timer = setTimeout(() => update(), 3000);
   }
 }
+$('#setup-form').addEventListener('input', () => {
+  start.disabled = busy || !online || state.connectedCount !== state.capacity;
+  validateDraft();
+});
+$('#preset').addEventListener('change', () => {
+  if ($('#preset').value) fillEditor(preset(Number($('#preset').value)));
+  validateDraft();
+});
+$('#setup-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!validateConfig(readDraft())) update('/api/config', readDraft());
+});
 form.addEventListener('submit', event => {
   event.preventDefault();
   update('/api/join', { name: $('#name').value });

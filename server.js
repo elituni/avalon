@@ -3,19 +3,51 @@ import { readFileSync } from 'node:fs';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { ROLE_INFO, preset, totals, validateConfig } from './public/roles.js';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/roles.js', ['roles.js', 'text/javascript; charset=utf-8']],
 ].map(([route, [file, type]]) => [route, {
   body: readFileSync(new URL(`./public/${file}`, import.meta.url)), type,
 }]));
-const roles = ['Resistance', 'Resistance', 'Merlin', 'Morgana', 'Assassin', 'Percival'];
+export function startingInformation(me, players) {
+  if (!me.role) return null;
+  let visible = [];
+  let heading = 'No players revealed';
+  let explanation = 'Your role gives you no information about other players.';
+  if (me.role === 'Merlin') {
+    visible = players.filter(p => ROLE_INFO[p.role].team === 'Evil' && p.role !== 'Mordred');
+    heading = 'Known Evil players';
+    explanation = 'Mordred is hidden from you. These players are Evil; their exact roles are not revealed.';
+  } else if (me.role === 'Percival') {
+    visible = players.filter(p => p.role === 'Merlin' || p.role === 'Morgana');
+    heading = 'Possible Merlins';
+    explanation = 'These players are Merlin or Morgana. You cannot tell their roles apart from this reveal.';
+    if (!visible.some(p => p.role === 'Morgana')) {
+      heading = 'Merlin';
+      explanation = 'No Morgana is in this game, so every revealed player is Merlin.';
+    } else if (!visible.some(p => p.role === 'Merlin')) {
+      heading = 'Morgana';
+      explanation = 'No Merlin is in this custom setup, so every revealed player is Morgana.';
+    }
+  } else if (me.role === 'Oberon') {
+    explanation = 'You are Evil, but you do not see your teammates and they do not see you. Merlin can see you.';
+  } else if (ROLE_INFO[me.role].team === 'Evil') {
+    visible = players.filter(p => p.id !== me.id && ROLE_INFO[p.role].team === 'Evil' && p.role !== 'Oberon');
+    heading = 'Known Evil teammates';
+    explanation = 'Oberon is hidden from your team. Exact teammate roles are not revealed.';
+  }
+  // Preserve public seat order, never group or sort candidates by their hidden roles.
+  return { heading, explanation, players: visible.map(p => ({ id: p.id, name: p.name })) };
+}
 
 export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
   const players = new Map();
   let phase = 'lobby';
+  let config = preset();
   let hostId = null;
   const kicked = new Set();
   const connected = player => now() - player.lastSeen < graceMs;
@@ -31,11 +63,13 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
     const me = players.get(token);
     return {
       phase,
+      config,
+      capacity: totals(config).total,
       hostId,
       kicked: kicked.has(token),
       connectedCount: [...players.values()].filter(connected).length,
       players: [...players.values()].map(p => ({ id: p.id, name: p.name, connected: connected(p) })),
-      me: me ? { id: me.id, name: me.name, role: me.role ?? null } : null,
+      me: me ? { id: me.id, name: me.name, role: me.role ?? null, team: me.role ? ROLE_INFO[me.role].team : null, information: startingInformation(me, [...players.values()]) } : null,
     };
   };
   return createServer(async (req, res) => {
@@ -50,7 +84,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
       const path = req.url.split('?')[0];
       if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true });
       if (path.startsWith('/api/')) {
-        const methods = { '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/leave': 'POST', '/api/host': 'POST', '/api/kick': 'POST' };
+        const methods = { '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/leave': 'POST', '/api/host': 'POST', '/api/kick': 'POST', '/api/config': 'POST' };
         if (!methods[path]) return send(404, { error: 'Not found' });
         if (req.method !== methods[path]) {
           res.setHeader('Allow', methods[path]);
@@ -84,7 +118,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
           if (!name || name.length > 24 || /[\u0000-\u001f\u007f]/.test(name)) return send(400, { error: 'Use a name between 1 and 24 characters.' });
           // Disconnected seats may be reclaimed before the game starts.
           for (const [key, p] of players) if (!connected(p)) players.delete(key);
-          if (players.size >= 6) return send(409, { error: 'The lobby is full.' });
+          if (players.size >= totals(config).total) return send(409, { error: 'The lobby is full.' });
           if ([...players.values()].some(p => p.name.toLowerCase() === name.toLowerCase())) return send(409, { error: 'That name is already taken.' });
           players.set(token, { id: randomUUID(), name, lastSeen: now() });
           kicked.delete(token);
@@ -113,11 +147,21 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
             kicked.add(targetToken);
           }
         }
+        if (path === '/api/config') {
+          if (!me || me.id !== hostId) return send(403, { error: 'Only the host can change the role setup.' });
+          if (phase !== 'lobby') return send(409, { error: 'Role setup is locked after the game starts.' });
+          let proposed;
+          try { proposed = JSON.parse(body); } catch { return send(400, { error: 'Invalid role setup.' }); }
+          const error = validateConfig(proposed);
+          if (error) return send(400, { error });
+          if (totals(proposed).total < players.size) return send(409, { error: 'There are more players in the lobby than seats in this setup. Remove players first.' });
+          config = { mode: proposed.mode, counts: { ...proposed.counts } };
+        }
         if (path === '/api/start') {
           if (!me) return send(403, { error: 'Join the lobby first.' });
           if (phase !== 'lobby') return send(409, { error: 'The game has already started.' });
-          if (players.size !== 6 || [...players.values()].some(p => !connected(p))) return send(409, { error: 'Exactly six connected players are needed.' });
-          const shuffled = [...roles];
+          if (players.size !== totals(config).total || [...players.values()].some(p => !connected(p))) return send(409, { error: `Exactly ${totals(config).total} connected players are needed.` });
+          const shuffled = Object.entries(config.counts).flatMap(([role, count]) => Array(count).fill(role));
           for (let i = shuffled.length - 1; i > 0; i--) {
             const j = randomInt(i + 1);
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
