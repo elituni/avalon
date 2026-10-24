@@ -1,0 +1,23 @@
+[Unit]
+Description=Avalon shared counter
+After=network.target
+
+[Service]
+Type=simple
+User=avalon
+Group=avalon
+WorkingDirectory=/opt/avalon/current
+ExecStart=/opt/node/bin/node server.js
+Environment=HOST=0.0.0.0
+Environment=PORT=3000
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

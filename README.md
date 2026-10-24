@@ -30,6 +30,23 @@ HOST=127.0.0.1 PORT=3001 npm start
 
 `GET /api/count` returns `{ "count": 0 }`; `POST /api/count` adds one and returns the new total. API responses are not cached. Browsers poll every second and reconnect automatically. Failed click requests are never automatically retried because the server may already have counted them.
 
-## Next: Droplet deployment
+## Deploy to the Droplet
 
-Copy this app to `178.128.7.152`, install a supported Node.js version, run it as a dedicated unprivileged user under systemd, and allow inbound TCP 3000 while preserving SSH. Then verify `http://178.128.7.152:3000` from a phone on cellular data. Deployment has not been performed yet.
+With local Node.js, Git, rsync, and SSH available, commit your changes and run:
+
+```sh
+bash scripts/deploy.sh
+```
+
+The default target is the `avalon-droplet` SSH alias (root at `178.128.7.152`). An alternate target can be passed as the first argument. The script uses `~/.ssh/config`; override this with `AVALON_SSH_CONFIG` if needed.
+
+Deployment requires a clean working tree, runs the tests, and transfers only the committed app and deployment files via rsync. Each release records its Git revision in `/opt/avalon/current/REVISION`. First-time setup installs an official Node.js 24 binary under `/opt/node`, verifies its published SHA-256 checksum, and creates an unprivileged `avalon` service user. Node.js is not automatically upgraded on subsequent deployments.
+
+The systemd service starts on boot, restarts after crashes, and listens on port 3000. The script allows port 3000 and SSH port 22 if UFW is active; any DigitalOcean cloud firewall must also permit port 3000. Deployment checks the API locally on the Droplet and restores the previous release if that check fails. Previous release directories are retained under `/opt/avalon/releases`.
+
+Open http://178.128.7.152:3000 and verify from a phone on cellular data. Every deployment restarts the app and resets the counter.
+
+```sh
+ssh -F ~/.ssh/config avalon-droplet 'systemctl status avalon --no-pager'
+ssh -F ~/.ssh/config avalon-droplet 'journalctl -u avalon -n 50 --no-pager'
+```
