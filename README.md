@@ -72,6 +72,6 @@ ssh -F ~/.ssh/config avalon-droplet 'journalctl -u avalon -n 50 --no-pager'
 
 ## Temporary Percival UI demo
 
-Run `AVALON_DEMO=1 npm start` to seed four always-connected NPCs and a five-player setup. Join as `laze` and start; that player is always Percival, while the other roles are shuffled among NPCs. The page labels this as a Percival demo. NPC seats and role configuration are fixed, and the human player is host. NPCs simulate seats only, not gameplay.
+Run `AVALON_DEMO=1 npm start` to seed three always-connected NPCs and a four-player UI demo (Merlin, Percival, Morgana, and Assassin). This exception applies only to the demo; normal games still require at least five players. Join as `laze` and start; that player is always Percival, while the other roles are shuffled among NPCs. The page labels this as a demo. NPC seats and role configuration are fixed, and the human player is host. NPCs simulate seats only, not gameplay.
 
 Normal mode is unchanged when `AVALON_DEMO` is unset. On the Droplet the demo can be enabled through `/etc/systemd/system/avalon.service.d/demo.conf` containing `[Service]` and `Environment=AVALON_DEMO=1`. Remove that specific override, run `systemctl daemon-reload`, and restart `avalon` to restore normal random assignments and an empty six-player lobby.

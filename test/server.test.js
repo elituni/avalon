@@ -294,21 +294,21 @@ test('standard Percival without Morgana sees Merlin; custom repeated roles work 
   assert.deepEqual(roles, { Assassin: 2, Morgana: 3, Resistance: 5, Merlin: 2, Percival: 3 });
 });
 
-test('opt-in Percival demo has four persistent NPCs and reserves Percival for laze', async t => {
+test('opt-in Percival demo has three persistent NPCs and reserves Percival for laze', async t => {
   const { client, advance } = await setup(t, { demo: true });
   const player = client();
   const initial = (await player.call()).data;
   assert.equal(initial.demo, true);
-  assert.equal(initial.capacity, 5);
-  assert.equal(initial.connectedCount, 4);
+  assert.equal(initial.capacity, 4);
+  assert.equal(initial.connectedCount, 3);
   assert.equal(initial.hostId, null);
-  assert.deepEqual(initial.players.map(p => p.name), ['NPC 1', 'NPC 2', 'NPC 3', 'NPC 4']);
+  assert.deepEqual(initial.players.map(p => p.name), ['NPC 1', 'NPC 2', 'NPC 3']);
   advance(60000);
-  assert.equal((await player.call()).data.connectedCount, 4);
+  assert.equal((await player.call()).data.connectedCount, 3);
   assert.equal((await player.call('/api/join', { name: 'Someone else' })).status, 400);
   const joined = (await player.call('/api/join', { name: 'laze' })).data;
   assert.equal(joined.hostId, joined.me.id);
-  assert.equal(joined.connectedCount, 5);
+  assert.equal(joined.connectedCount, 4);
   assert.equal((await player.call('/api/config', joined.config)).status, 409);
   assert.equal((await player.call('/api/kick', { playerId: initial.players[0].id })).status, 409);
   const started = (await player.call('/api/start')).data;

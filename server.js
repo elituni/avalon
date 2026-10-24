@@ -47,12 +47,17 @@ export function startingInformation(me, players) {
 export function createGameServer({ now = Date.now, graceMs = 15000, demo = false } = {}) {
   const players = new Map();
   if (demo) {
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 3; i++) {
       players.set(randomBytes(32).toString('hex'), { id: randomUUID(), name: `NPC ${i}`, npc: true, lastSeen: now() });
     }
   }
   let phase = 'lobby';
   let config = preset(demo ? 5 : 6);
+  if (demo) {
+    // Four-seat UI demo only; normal setups still require at least five players.
+    config.mode = 'custom';
+    config.counts.Resistance = 0;
+  }
   let hostId = null;
   const kicked = new Set();
   const connected = player => player.npc || now() - player.lastSeen < graceMs;
@@ -157,7 +162,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
         }
         if (path === '/api/config') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can change the role setup.' });
-          if (demo) return send(409, { error: 'This demo uses five players with laze as Percival.' });
+          if (demo) return send(409, { error: 'This demo uses four players with laze as Percival.' });
           if (phase !== 'lobby') return send(409, { error: 'Role setup is locked after the game starts.' });
           let proposed;
           try { proposed = JSON.parse(body); } catch { return send(400, { error: 'Invalid role setup.' }); }
