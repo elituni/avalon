@@ -37,7 +37,7 @@ systemctl daemon-reload
 systemctl enable avalon
 systemctl restart avalon
 for attempt in {1..15}; do
-  if systemctl is-active --quiet avalon && curl --max-time 3 -fsS http://127.0.0.1:3000/api/count; then
+  if systemctl is-active --quiet avalon && curl --max-time 3 -fsS http://127.0.0.1:3000/api/health; then
     printf '\nDeployed revision: '
     cat "$release/REVISION"
     exit 0

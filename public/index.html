@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#132b25">
-    <title>Avalon · Shared counter</title>
+    <title>Avalon · Game night</title>
     <link rel="stylesheet" href="/style.css">
     <script src="/app.js" defer></script>
   </head>
@@ -12,16 +12,29 @@
     <header><a class="wordmark" href="/">AVALON<span class="star" aria-hidden="true">✦</span></a><span class="edition">THE FIRST QUEST / 001</span></header>
     <main>
       <p class="eyebrow">A SEAT AT THE SAME TABLE</p>
-      <h1>Every press<br>brings us together.</h1>
-      <p class="intro">One button. One shared count. Give it a press and watch the total grow with everyone else.</p>
-      <section class="counter-card" aria-label="Shared counter">
-        <div class="card-top"><span>TOTAL PRESSES</span><span id="connection" role="status" data-state="connecting">Connecting…</span></div>
-        <p id="count" class="count" aria-label="Total presses">—</p>
-        <button id="increment" type="button" disabled><span>Add one</span><span aria-hidden="true">＋</span></button>
-        <p id="feedback" class="feedback" role="status">Everyone shares this total.</p>
+      <h1>Gather your six.<br>Keep your secret.</h1>
+      <p class="intro">Join your friends at the table. When all six are connected, start the game to discover your role.</p>
+      <section class="counter-card" aria-label="Game lobby">
+        <div class="card-top"><span id="lobby-count">0 / 6 CONNECTED</span><span id="connection" role="status" data-state="connecting">Connecting…</span></div>
+        <form id="join-form" hidden>
+          <label for="name">Your name</label>
+          <input id="name" name="name" maxlength="24" required autocomplete="nickname" placeholder="What should we call you?">
+          <button id="join" type="submit" disabled>Join game <span aria-hidden="true">＋</span></button>
+        </form>
+        <ul id="players" aria-label="Players"></ul>
+        <div id="role-panel" hidden>
+          <p class="eyebrow">FOR YOUR EYES ONLY</p>
+          <h2 id="role"></h2>
+          <p id="team"></p>
+          <p class="footnote">Keep your role secret. Your assignment stays the same if you refresh.</p>
+        </div>
+        <button id="start" type="button" hidden disabled>Start game <span aria-hidden="true">→</span></button>
+        <p id="hint" class="feedback">Connecting to the table…</p>
+        <p id="feedback" class="feedback" role="status"></p>
+        <button id="leave" class="secondary" type="button" hidden>Leave lobby</button>
       </section>
-      <p class="footnote">Every click counts. Open another tab and try it together.</p>
-      <noscript>Enable JavaScript to view and use the shared counter.</noscript>
+      <p class="footnote">Six players. Four loyal to the Resistance. Two working against it.</p>
+      <noscript>Enable JavaScript to join the game.</noscript>
     </main>
     <footer><span>A small beginning for game night.</span><span>AVALON PROTOTYPE</span></footer>
   </body>

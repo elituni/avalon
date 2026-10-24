@@ -1,6 +1,6 @@
-# Avalon shared counter
+# Avalon six-player lobby
 
-A tiny shared counter using Node.js and plain browser JavaScript. No dependencies or build step.
+A shared lobby and private role reveal using Node.js and plain browser JavaScript. No dependencies or build step.
 
 ## Run locally
 
@@ -10,25 +10,25 @@ Use Node.js 22 or newer:
 npm start
 ```
 
-Open http://localhost:3000 in two browser tabs. Click **Add one** in either tab; the other tab should update within about a second. Each click counts, including repeated clicks by the same person. Stop with Ctrl+C.
+Open http://localhost:3000. Enter a unique display name and join. Exactly six connected players are required to start; any joined player may start. The server randomly deals two Resistance roles and one each of Merlin, Morgana, Assassin, and Percival. Each browser receives only its own role.
 
-The total lives in one server process and resets to zero whenever the process restarts. Run only one instance. There are no accounts, rooms, roles, or persistent storage yet.
+A browser session cookie identifies a player across tabs and refreshes. To test six players, use six separate browser profiles or devices (ordinary tabs share one seat). Private windows from the same browser may also share cookies.
+
+Browsers send heartbeats every three seconds. A player is disconnected after 15 seconds without one, including when a device sleeps or the browser suspends background tabs. Before starting, disconnected seats can be reclaimed by new players. Players can also explicitly leave the lobby. After starting, the roster is locked and reconnecting restores the original role.
+
+State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, role-specific knowledge, or in-app new-game/reset control yet. A session identifies a browser, not a verified person.
 
 ```sh
 npm test
 ```
 
-Tests cover shared reads, 50 simultaneous increments, fresh-server reset, asset routes, and unsupported requests.
+Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, and fresh-server reset.
 
 ## Configuration
 
-The default listener is `0.0.0.0:3000`. Override it with environment variables:
+The default listener is `0.0.0.0:3000`. Override with `HOST` and `PORT`. The current IP-based deployment uses HTTP; private role responses are access-controlled by session but transport is not encrypted. HTTPS should be added before relying on role secrecy over untrusted networks.
 
-```sh
-HOST=127.0.0.1 PORT=3001 npm start
-```
-
-`GET /api/count` returns `{ "count": 0 }`; `POST /api/count` adds one and returns the new total. API responses are not cached. Browsers poll every second and reconnect automatically. Failed click requests are never automatically retried because the server may already have counted them.
+The API provides `GET /api/state`, `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, and `/api/leave`. Join accepts `{ "name": "Alice" }`. Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
 
 ## Deploy to the Droplet
 
@@ -44,7 +44,7 @@ Deployment requires a clean working tree, runs the tests, and transfers only the
 
 The systemd service starts on boot, restarts after crashes, and listens on port 3000. The script allows port 3000 and SSH port 22 if UFW is active; any DigitalOcean cloud firewall must also permit port 3000. Deployment checks the API locally on the Droplet and restores the previous release if that check fails. Previous release directories are retained under `/opt/avalon/releases`.
 
-Open http://178.128.7.152:3000 and verify from a phone on cellular data. Every deployment restarts the app and resets the counter.
+Open http://178.128.7.152:3000 and verify from a phone on cellular data. Every deployment restarts the app and clears the lobby and roles.
 
 ```sh
 ssh -F ~/.ssh/config avalon-droplet 'systemctl status avalon --no-pager'

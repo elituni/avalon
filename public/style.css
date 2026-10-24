@@ -29,3 +29,21 @@ footer { padding: 22px 0; border-top: 1px solid #d9ddd2; color: #657168; gap: 15
 footer span:first-child { letter-spacing: 0; font-size: 12px; }
 @media (max-width: 480px) { .edition { display: none; } main { margin-top: 38px; } .counter-card { padding: 22px; } footer { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+[hidden] { display: none !important; }
+form { text-align: left; margin-top: 26px; }
+label { display: block; font-size: 13px; margin-bottom: 8px; }
+input { width: 100%; border: 1px solid #b8c4b8; background: #fff; color: #132b25; border-radius: 8px; padding: 14px; font: inherit; margin-bottom: 12px; }
+input:focus-visible { outline: 3px solid #a78950; outline-offset: 2px; }
+#players { padding: 0; list-style: none; margin: 24px 0; text-align: left; }
+#players li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid #e7e9df; font-size: 14px; }
+#players li span:first-child { overflow-wrap: anywhere; min-width: 0; }
+.player-online, .player-offline { font-size: 11px; flex-shrink: 0; }
+.player-online { color: #36744e; }
+.player-offline { color: #946846; }
+#role-panel { border: 1px solid #c4cebd; border-radius: 12px; padding: 24px 16px; background: #eef2e8; }
+#role { font: 38px Georgia, serif; margin: 18px 0; }
+#team { font-size: 14px; }
+.secondary { background: transparent; color: #657168; border: 1px solid #d9ddd2; min-height: 42px; justify-content: center; font-size: 12px; margin-top: 18px; }
+.secondary:hover:not(:disabled) { background: #eef2e8; }
+#feedback { color: #9e3c29; }
+#feedback:empty { display: none; }
