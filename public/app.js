@@ -78,6 +78,8 @@ function render() {
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
   leave.hidden = !joined || started;
   leave.disabled = busy || !online;
+  const knowsEvil = state.me?.role === 'Merlin' || state.me?.team === 'Evil';
+  const knownEvil = new Set(knowsEvil ? (state.me.information?.players || []).map(player => player.id) : []);
   const seats = Array.from({ length: state.capacity }, (_, index) => {
     const player = state.players[index];
     const row = document.createElement('li');
@@ -90,6 +92,7 @@ function render() {
       return row;
     }
     row.classList.toggle('is-me', player.id === state.me?.id);
+    row.classList.toggle('known-evil', knownEvil.has(player.id));
     avatar.textContent = player.name.split(/\s+/).map(part => Array.from(part)[0]).slice(0, 2).join('').toUpperCase();
     name.textContent = player.name + (player.id === state.me?.id ? ' (you)' : '');
     const meta = document.createElement('div'); meta.className = 'player-meta';
@@ -99,6 +102,9 @@ function render() {
     meta.append(status);
     if (player.id === state.hostId) {
       const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
+    }
+    if (knownEvil.has(player.id)) {
+      const badge = document.createElement('span'); badge.className = 'evil-badge'; badge.textContent = 'Known Evil'; meta.append(badge);
     }
     row.append(meta);
     if (!state.demo && !started && state.me?.id === state.hostId && player.id !== state.me.id) {

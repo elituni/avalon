@@ -38,6 +38,10 @@ h1, h2, h3, p { margin: 0; }
 .player-offline { color: #986447; }
 .host-badge { color: #8d692a; background: #f4ecd9; border-radius: 3px; padding: 2px 5px; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
 #players > li.is-me { border-color: #b9a16e; background: #fcfaf4; }
+#players > li.known-evil { border-color: #e2b5af; background: #fff0ed; }
+.known-evil .avatar { background: #f2d6d1; color: #a15a50; }
+.evil-badge { color: #974b40; background: #f6dcd7; border-radius: 3px; padding: 2px 5px; font-size: 9px; white-space: nowrap; }
+.player-meta { flex-wrap: wrap; }
 #players > li.empty-seat { border-style: dashed; background: transparent; color: #95a0a6; justify-content: center; }
 .empty-seat .avatar { background: #f0f3f4; color: #bdc6cb; font-size: 21px; font-weight: 400; }
 .empty-seat .player-name { font-weight: 400; font-size: 12px; }
