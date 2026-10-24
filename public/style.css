@@ -41,6 +41,9 @@ h1, h2, h3, p { margin: 0; }
 #players > li.known-evil { border-color: #e2b5af; background: #fff0ed; }
 .known-evil .avatar { background: #f2d6d1; color: #a15a50; }
 .evil-badge { color: #974b40; background: #f6dcd7; border-radius: 3px; padding: 2px 5px; font-size: 9px; white-space: nowrap; }
+#players > li.merlin-candidate { border-color: #aec9e2; background: #edf5ff; }
+.merlin-candidate .avatar { background: #d6e7f7; color: #476f98; }
+.merlin-badge { color: #365f88; background: #d8e9fa; border-radius: 3px; padding: 2px 5px; font-size: 9px; white-space: nowrap; }
 .player-meta { flex-wrap: wrap; }
 #players > li.empty-seat { border-style: dashed; background: transparent; color: #95a0a6; justify-content: center; }
 .empty-seat .avatar { background: #f0f3f4; color: #bdc6cb; font-size: 21px; font-weight: 400; }
