@@ -122,7 +122,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           try { data = JSON.parse(body); } catch { return send(400, { error: 'Enter a display name.' }); }
           const name = typeof data?.name === 'string' ? data.name.trim().replace(/\s+/g, ' ') : '';
           if (!name || name.length > 24 || /[\u0000-\u001f\u007f]/.test(name)) return send(400, { error: 'Use a name between 1 and 24 characters.' });
-          if (demo && name.toLowerCase() !== 'laze') return send(400, { error: 'Join as laze for this Morgana demo.' });
+          if (demo && name.toLowerCase() !== 'laze') return send(400, { error: 'Join as laze for this Percival demo.' });
           // Disconnected seats may be reclaimed before the game starts.
           for (const [key, p] of players) if (!connected(p)) players.delete(key);
           if (players.size >= totals(config).total) return send(409, { error: 'The lobby is full.' });
@@ -157,7 +157,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
         }
         if (path === '/api/config') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can change the role setup.' });
-          if (demo) return send(409, { error: 'This demo uses five players with laze as Morgana.' });
+          if (demo) return send(409, { error: 'This demo uses five players with laze as Percival.' });
           if (phase !== 'lobby') return send(409, { error: 'Role setup is locked after the game starts.' });
           let proposed;
           try { proposed = JSON.parse(body); } catch { return send(400, { error: 'Invalid role setup.' }); }
@@ -178,8 +178,8 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           [...players.values()].forEach((p, i) => { p.role = shuffled[i]; });
           if (demo) {
             const laze = [...players.values()].find(p => !p.npc && p.name.toLowerCase() === 'laze');
-            const morgana = [...players.values()].find(p => p.role === 'Morgana');
-            [laze.role, morgana.role] = [morgana.role, laze.role];
+            const percival = [...players.values()].find(p => p.role === 'Percival');
+            [laze.role, percival.role] = [percival.role, laze.role];
           }
           phase = 'started';
         }
