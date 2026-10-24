@@ -39,7 +39,7 @@ Standard setup uses the original game’s team counts: 5 players = 3 Resistance 
 - Assassin, Morgana, Mordred, and ordinary spies see their spy teammates except Oberon, without exact roles.
 - Resistance and Oberon receive no other-player identities. Oberon still knows their own Spy allegiance.
 
-Repeated special roles in custom mode each receive the same visibility rules. A custom Percival sees all Merlin/Morgana candidates; Merlins do not learn other Merlins. Candidate lists follow public seating order rather than sorting by secret role. Information persists through refreshes and reconnects. The host has no special access to anyone else’s role or knowledge.
+Repeated special roles in custom mode each receive the same visibility rules. A custom Percival sees all Merlin/Morgana candidates; Merlins do not learn other Merlins. Candidate lists follow public seating order rather than sorting by secret role. Assignments and information persist through refreshes and reconnects. The UI starts concealed as **Your role: ??**; click to reveal your role, team, private information, and player highlights, and click again to hide them. Polling preserves the toggle state, while a page refresh conceals it again. This is a screen-privacy control; the authenticated browser still receives its own private state. The host has no special access to anyone else’s role or knowledge.
 
 Rules checked against the original [Avalon rulebook PDF](https://avalon.fun/pdfs/rules.pdf) and its [text transcription](https://www.rulespal.com/resistance-avalon/rulebook). This scope covers the original roles and opening reveal, not expansion characters or gameplay powers such as Lady of the Lake.
 

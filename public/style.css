@@ -81,7 +81,11 @@ select { width: 100%; padding: 7px; font-size: 12px; }
 .private-panel[data-team="Spy"] { background: #fbf4f2; }
 .role-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .eyebrow { font-size: 9px; letter-spacing: .1em; color: #7b8b93; font-weight: 650; }
-#role { font: 28px Georgia, serif; margin-top: 6px; color: #3d5d70; }
+#role { font: 26px Georgia, serif; margin-left: 8px; color: #3d5d70; }
+.role-toggle { width: 100%; padding: 0; border: 0; background: transparent; color: #526873; justify-content: space-between; text-align: left; font-weight: 500; }
+.role-toggle:hover:not(:disabled) { background: transparent; color: #263238; }
+#role-toggle-hint { font-size: 11px; text-decoration: underline; }
+#role-content { margin-top: 16px; }
 .private-panel[data-team="Spy"] #role { color: #a36559; }
 #information-heading { font-size: 12px; font-weight: 600; margin-top: 20px; }
 #information-players { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 7px; }

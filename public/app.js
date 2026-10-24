@@ -12,6 +12,8 @@ let timer;
 let online = false;
 let editorKey;
 let savedConfig;
+let informationVisible = false;
+let privateIdentity;
 
 function readDraft() {
   return { mode: $('#mode').value, counts: Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, Number(document.getElementById(`role-${role}`).value)])) };
@@ -45,7 +47,7 @@ function validateDraft() {
 }
 function renderSetup(started) {
   const counts = totals(state.config);
-  $('#setup-summary').textContent = `${state.demo ? 'Percival demo' : state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Resistance} Resistance / ${counts.Spy} Spy`;
+  $('#setup-summary').textContent = `${state.demo ? 'Demo' : state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Resistance} Resistance / ${counts.Spy} Spy`;
   $('#setup-roles').replaceChildren(...Object.entries(state.config.counts).filter(([, n]) => n).map(([role, n]) => {
     const chip = document.createElement('span'); chip.className = 'role-chip'; chip.dataset.team = ROLE_INFO[role].team;
     const amount = document.createElement('b'); amount.textContent = `×${n}`;
@@ -70,6 +72,11 @@ function render() {
   if (!state) return;
   const joined = Boolean(state.me);
   const started = state.phase === 'started';
+  const identity = state.me?.role ? `${state.me.id}:${state.me.role}` : null;
+  if (identity !== privateIdentity) {
+    privateIdentity = identity;
+    informationVisible = false;
+  }
   $('#lobby-count').textContent = `${state.connectedCount} / ${state.capacity} online`;
   form.hidden = joined || started;
   if (state.demo && !joined && !$('#name').value) $('#name').value = 'laze';
@@ -78,9 +85,9 @@ function render() {
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
   leave.hidden = !joined || started;
   leave.disabled = busy || !online;
-  const knowsSpy = state.me?.role === 'Merlin' || state.me?.team === 'Spy';
+  const knowsSpy = informationVisible && (state.me?.role === 'Merlin' || state.me?.team === 'Spy');
   const knownSpy = new Set(knowsSpy ? (state.me.information?.players || []).map(player => player.id) : []);
-  const merlinCandidates = new Set(state.me?.role === 'Percival' ? (state.me.information?.players || []).map(player => player.id) : []);
+  const merlinCandidates = new Set(informationVisible && state.me?.role === 'Percival' ? (state.me.information?.players || []).map(player => player.id) : []);
   const seats = Array.from({ length: state.capacity }, (_, index) => {
     const player = state.players[index];
     const row = document.createElement('li');
@@ -128,11 +135,15 @@ function render() {
   });
   $('#players').replaceChildren(...seats);
   $('#role-panel').hidden = !state.me?.role;
-  $('#role-panel').dataset.team = state.me?.team || '';
-  $('#role').textContent = state.me?.role || '';
-  $('#team').textContent = state.me?.team ? `${state.me.team} team` : '';
-  $('#role-description').textContent = ROLE_INFO[state.me?.role]?.description || '';
-  const information = state.me?.information;
+  $('#role-panel').dataset.team = informationVisible ? state.me?.team || '' : '';
+  $('#role').textContent = informationVisible ? state.me?.role || '??' : '??';
+  $('#role-toggle').setAttribute('aria-expanded', String(informationVisible));
+  $('#role-toggle-hint').textContent = informationVisible ? 'Hide' : 'Show';
+  $('#role-content').hidden = !informationVisible;
+  if (!informationVisible) $('.role-help').open = false;
+  $('#team').textContent = informationVisible && state.me?.team ? `${state.me.team} team` : '';
+  $('#role-description').textContent = informationVisible ? ROLE_INFO[state.me?.role]?.description || '' : '';
+  const information = informationVisible ? state.me?.information : null;
   $('#information-heading').textContent = information?.heading || '';
   $('#information-explanation').textContent = information?.explanation || '';
   $('#information-players').replaceChildren(...(information?.players || []).map(player => {
@@ -187,6 +198,11 @@ async function update(path = '/api/heartbeat', body) {
     timer = setTimeout(() => update(), 3000);
   }
 }
+$('#role-toggle').addEventListener('click', () => {
+  if (!state?.me?.role) return;
+  informationVisible = !informationVisible;
+  render();
+});
 $('#setup-form').addEventListener('input', () => {
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
   validateDraft();

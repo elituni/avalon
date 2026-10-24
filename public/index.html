@@ -32,10 +32,13 @@
         </div>
         <p id="feedback" class="error" role="status"></p>
         <section id="role-panel" class="private-panel" hidden aria-label="Your private role">
-          <div class="role-heading"><div><p class="eyebrow">YOUR ROLE · PRIVATE</p><h2 id="role"></h2></div><span id="team" class="badge"></span></div>
+          <button id="role-toggle" class="role-toggle" type="button" aria-expanded="false" aria-controls="role-content"><span>Your role: <strong id="role">??</strong></span><span id="role-toggle-hint">Show</span></button>
+          <div id="role-content" hidden>
+          <span id="team" class="badge"></span>
           <h3 id="information-heading"></h3>
           <ul id="information-players" aria-label="Your starting information"></ul>
           <details class="role-help"><summary>Role details</summary><p id="role-description"></p><p id="information-explanation"></p></details>
+          </div>
         </section>
       </section>
       <aside class="setup-panel panel" aria-labelledby="setup-title">
