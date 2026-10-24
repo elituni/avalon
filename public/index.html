@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#132b25">
+    <title>Avalon · Shared counter</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header><a class="wordmark" href="/">AVALON<span class="star" aria-hidden="true">✦</span></a><span class="edition">THE FIRST QUEST / 001</span></header>
+    <main>
+      <p class="eyebrow">A SEAT AT THE SAME TABLE</p>
+      <h1>Every press<br>brings us together.</h1>
+      <p class="intro">One button. One shared count. Give it a press and watch the total grow with everyone else.</p>
+      <section class="counter-card" aria-label="Shared counter">
+        <div class="card-top"><span>TOTAL PRESSES</span><span id="connection" role="status" data-state="connecting">Connecting…</span></div>
+        <p id="count" class="count" aria-label="Total presses">—</p>
+        <button id="increment" type="button" disabled><span>Add one</span><span aria-hidden="true">＋</span></button>
+        <p id="feedback" class="feedback" role="status">Everyone shares this total.</p>
+      </section>
+      <p class="footnote">Every click counts. Open another tab and try it together.</p>
+      <noscript>Enable JavaScript to view and use the shared counter.</noscript>
+    </main>
+    <footer><span>A small beginning for game night.</span><span>AVALON PROTOTYPE</span></footer>
+  </body>
+</html>
