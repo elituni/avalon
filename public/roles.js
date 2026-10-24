@@ -29,23 +29,13 @@ export function totals(config) {
   }
   return result;
 }
-export function validateConfig(config, { demo = false } = {}) {
+export function validateConfig(config) {
   if (!config || !['standard', 'custom'].includes(config.mode) || !config.counts || typeof config.counts !== 'object' || Array.isArray(config.counts)) return 'Choose a setup mode and role counts.';
   if (Object.keys(config.counts).length !== Object.keys(ROLE_INFO).length || Object.keys(config.counts).some(role => !Object.hasOwn(ROLE_INFO, role))) return 'Use only the eight supported roles.';
   for (const role of Object.keys(ROLE_INFO)) {
     if (!Number.isInteger(config.counts[role]) || config.counts[role] < 0 || config.counts[role] > 15) return 'Role counts must be whole numbers from 0 to 15.';
   }
-  const { total, Resistance, Spy } = totals(config);
-  const max = config.mode === 'standard' ? 10 : 15;
-  if (demo && (config.mode !== 'custom' || total !== 4)) return 'The demo has four seats. Use custom mode with four roles.';
-  if (demo && config.counts.Percival < 1) return 'Keep a Percival role for laze in this demo.';
-  if (total < (demo ? 4 : 5) || total > max) return `Choose between 5 and ${max} players in ${config.mode} mode.`;
-  if (!Resistance || !Spy) return 'Include at least one Resistance player and one Spy player.';
-  if (config.mode === 'standard') {
-    if (Spy !== SPY_COUNTS[total]) return `A standard ${total}-player game needs ${total - SPY_COUNTS[total]} Resistance and ${SPY_COUNTS[total]} Spy players.`;
-    if (config.counts.Merlin !== 1 || config.counts.Assassin !== 1) return 'Standard setup includes exactly one Merlin and one Assassin. Use custom mode for variants.';
-    for (const role of ['Percival', 'Morgana', 'Mordred', 'Oberon']) if (config.counts[role] > 1) return `Standard setup allows at most one ${role}.`;
-    if (total === 5 && config.counts.Percival && !config.counts.Morgana && !config.counts.Mordred) return 'For five players with Percival, include Morgana or Mordred.';
-  }
+  const { total } = totals(config);
+  if (total < 1 || total > 15) return 'Choose between 1 and 15 total roles.';
   return null;
 }

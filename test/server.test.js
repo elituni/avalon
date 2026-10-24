@@ -210,12 +210,12 @@ test('only the host can configure roles; invalid setups and shrinking an occupie
     const config = preset(); config.counts.Merlin = value; invalid.push(config);
   }
   const extra = preset(); extra.counts.FakeRole = 0; invalid.push(extra);
-  const wrongBalance = preset(); wrongBalance.counts.Resistance--; wrongBalance.counts.Spy++; invalid.push(wrongBalance);
-  const duplicate = preset(10); duplicate.counts.Percival++; duplicate.counts.Resistance--; invalid.push(duplicate);
-  const missing = preset(); missing.counts.Merlin = 0; missing.counts.Resistance++; invalid.push(missing);
-  const weakFive = preset(5); weakFive.counts.Morgana = 0; weakFive.counts.Spy++; invalid.push(weakFive);
+
+
+
+
   const sixteen = preset(15); sixteen.counts.Resistance++; invalid.push(sixteen);
-  const oneTeam = { mode: 'custom', counts: { ...emptyCounts(), Resistance: 5 } }; invalid.push(oneTeam);
+  invalid.push({ mode: 'custom', counts: emptyCounts() });
   for (const config of invalid) {
     assert.equal((await host.call('/api/config', config)).status, 400);
     assert.equal((await host.call()).data.capacity, 15);
@@ -305,7 +305,7 @@ test('opt-in Percival demo has three persistent NPCs and reserves Percival for l
   assert.deepEqual(initial.players.map(p => p.name), ['NPC 1', 'NPC 2', 'NPC 3']);
   advance(60000);
   assert.equal((await player.call()).data.connectedCount, 3);
-  assert.equal((await player.call('/api/join', { name: 'Someone else' })).status, 400);
+
   const joined = (await player.call('/api/join', { name: 'laze' })).data;
   assert.equal(joined.hostId, joined.me.id);
   assert.equal(joined.connectedCount, 4);
@@ -316,9 +316,11 @@ test('opt-in Percival demo has three persistent NPCs and reserves Percival for l
   assert.equal((await player.call()).data.config.counts.Spy, 1);
   const noPercival = structuredClone(edited);
   noPercival.counts.Percival = 0; noPercival.counts.Resistance = 1;
-  assert.equal((await player.call('/api/config', noPercival)).status, 400);
+  assert.equal((await player.call('/api/config', noPercival)).status, 200);
   const tooMany = structuredClone(edited); tooMany.counts.Resistance = 1;
-  assert.equal((await player.call('/api/config', tooMany)).status, 400);
+  assert.equal((await player.call('/api/config', tooMany)).status, 200);
+  assert.equal((await player.call()).data.capacity, 5);
+  assert.equal((await player.call('/api/config', edited)).status, 200);
   assert.equal((await client().call('/api/config', edited)).status, 403);
   assert.equal((await player.call('/api/kick', { playerId: initial.players[0].id })).status, 409);
   const started = (await player.call('/api/start')).data;
@@ -340,4 +342,37 @@ test('normal games do not seed NPCs or enable demo restrictions', async t => {
   assert.equal(state.capacity, 6);
   assert.deepEqual(state.players, []);
   assert.equal((await player.call('/api/join', { name: 'Anyone' })).status, 200);
+});
+
+
+test('host can use any role mix, including a single team and no special roles', async t => {
+  const { emptyCounts } = await import('../public/roles.js');
+  const { client } = await setup(t, { demo: true });
+  const host = client();
+  await host.call('/api/join', { name: 'laze' });
+  for (const counts of [
+    { ...emptyCounts(), Merlin: 4 },
+    { ...emptyCounts(), Morgana: 4 },
+    { ...emptyCounts(), Resistance: 2, Spy: 2 },
+    { ...emptyCounts(), Assassin: 3, Percival: 1 },
+    { ...emptyCounts(), Resistance: 4 },
+  ]) {
+    assert.equal((await host.call('/api/config', { mode: 'custom', counts })).status, 200);
+  }
+  const started = await host.call('/api/start');
+  assert.equal(started.status, 200);
+  assert.equal(started.data.me.role, 'Resistance');
+  assert.equal(started.data.me.information.players.length, 0);
+});
+
+test('smaller demo setups release NPC seats and allow starting without Percival', async t => {
+  const { emptyCounts } = await import('../public/roles.js');
+  const { client } = await setup(t, { demo: true });
+  const host = client();
+  await host.call('/api/join', { name: 'laze' });
+  const saved = await host.call('/api/config', { mode: 'custom', counts: { ...emptyCounts(), Spy: 1 } });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.data.capacity, 1);
+  assert.equal(saved.data.players.length, 1);
+  assert.equal((await host.call('/api/start')).data.me.role, 'Spy');
 });

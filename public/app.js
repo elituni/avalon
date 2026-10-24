@@ -37,9 +37,9 @@ function fillEditor(config) {
 function validateDraft() {
   if (!state || $('#setup-form').hidden) return;
   const draft = readDraft();
-  const error = validateConfig(draft, { demo: state.demo });
+  const error = validateConfig(draft);
   const counts = totals(draft);
-  const overcrowded = counts.total < state.players.length;
+  const overcrowded = !state.demo && counts.total < state.players.length;
   const dirty = JSON.stringify(draft) !== savedConfig;
   $('#setup-validation').textContent = error || (overcrowded ? 'Remove players to reduce seats.' : `${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy${dirty ? ' · Unsaved' : ' · Saved'}`);
   $('#save-setup').disabled = busy || !online || !dirty || Boolean(error) || overcrowded;
@@ -57,8 +57,6 @@ function renderSetup(started) {
   const host = state.me?.id === state.hostId;
   $('#setup-form').hidden = !host || started;
   $('#setup-editor').hidden = !host || started;
-  $('#preset').closest('.select-row').hidden = state.demo;
-  $('#mode').querySelector('[value="standard"]').disabled = state.demo;
   const key = JSON.stringify([state.hostId, state.config]);
   if (key !== editorKey) {
     fillEditor(state.config);
@@ -205,7 +203,8 @@ $('#role-toggle').addEventListener('click', () => {
   informationVisible = !informationVisible;
   render();
 });
-$('#setup-form').addEventListener('input', () => {
+$('#setup-form').addEventListener('input', event => {
+  if (event.target.closest('#role-inputs')) $('#mode').value = 'custom';
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
   validateDraft();
 });
@@ -215,7 +214,7 @@ $('#preset').addEventListener('change', () => {
 });
 $('#setup-form').addEventListener('submit', event => {
   event.preventDefault();
-  if (!validateConfig(readDraft(), { demo: state.demo })) update('/api/config', readDraft());
+  if (!validateConfig(readDraft())) update('/api/config', readDraft());
 });
 form.addEventListener('submit', event => {
   event.preventDefault();

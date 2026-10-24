@@ -127,7 +127,6 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           try { data = JSON.parse(body); } catch { return send(400, { error: 'Enter a display name.' }); }
           const name = typeof data?.name === 'string' ? data.name.trim().replace(/\s+/g, ' ') : '';
           if (!name || name.length > 24 || /[\u0000-\u001f\u007f]/.test(name)) return send(400, { error: 'Use a name between 1 and 24 characters.' });
-          if (demo && name.toLowerCase() !== 'laze') return send(400, { error: 'Join as laze for this Percival demo.' });
           // Disconnected seats may be reclaimed before the game starts.
           for (const [key, p] of players) if (!connected(p)) players.delete(key);
           if (players.size >= totals(config).total) return send(409, { error: 'The lobby is full.' });
@@ -165,9 +164,18 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           if (phase !== 'lobby') return send(409, { error: 'Role setup is locked after the game starts.' });
           let proposed;
           try { proposed = JSON.parse(body); } catch { return send(400, { error: 'Invalid role setup.' }); }
-          const error = validateConfig(proposed, { demo });
+          const error = validateConfig(proposed);
           if (error) return send(400, { error });
-          if (totals(proposed).total < players.size) return send(409, { error: 'There are more players in the lobby than seats in this setup. Remove players first.' });
+          const capacity = totals(proposed).total;
+          const humans = [...players.values()].filter(p => !p.npc).length;
+          if (capacity < (demo ? humans : players.size)) return send(409, { error: 'There are more players in the lobby than seats in this setup. Remove players first.' });
+          if (demo) {
+            // A smaller demo setup can release NPC seats, never human seats.
+            for (const [key, player] of [...players.entries()].reverse()) {
+              if (players.size <= capacity) break;
+              if (player.npc) players.delete(key);
+            }
+          }
           config = { mode: proposed.mode, counts: { ...proposed.counts } };
         }
         if (path === '/api/start') {
@@ -183,7 +191,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           if (demo) {
             const laze = [...players.values()].find(p => !p.npc && p.name.toLowerCase() === 'laze');
             const percival = [...players.values()].find(p => p.role === 'Percival');
-            [laze.role, percival.role] = [percival.role, laze.role];
+            if (laze && percival) [laze.role, percival.role] = [percival.role, laze.role];
           }
           phase = 'started';
         }
