@@ -39,13 +39,13 @@ function validateDraft() {
   const counts = totals(draft);
   const overcrowded = counts.total < state.players.length;
   const dirty = JSON.stringify(draft) !== savedConfig;
-  $('#setup-validation').textContent = error || (overcrowded ? 'Remove players to reduce seats.' : `${counts.total} seats · ${counts.Good} Good / ${counts.Evil} Evil${dirty ? ' · Unsaved' : ' · Saved'}`);
+  $('#setup-validation').textContent = error || (overcrowded ? 'Remove players to reduce seats.' : `${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy${dirty ? ' · Unsaved' : ' · Saved'}`);
   $('#save-setup').disabled = busy || !online || !dirty || Boolean(error) || overcrowded;
   if (dirty) start.disabled = true;
 }
 function renderSetup(started) {
   const counts = totals(state.config);
-  $('#setup-summary').textContent = `${state.demo ? 'Percival demo' : state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Good} Good / ${counts.Evil} Evil`;
+  $('#setup-summary').textContent = `${state.demo ? 'Percival demo' : state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Resistance} Resistance / ${counts.Spy} Spy`;
   $('#setup-roles').replaceChildren(...Object.entries(state.config.counts).filter(([, n]) => n).map(([role, n]) => {
     const chip = document.createElement('span'); chip.className = 'role-chip'; chip.dataset.team = ROLE_INFO[role].team;
     const amount = document.createElement('b'); amount.textContent = `×${n}`;
@@ -78,8 +78,8 @@ function render() {
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
   leave.hidden = !joined || started;
   leave.disabled = busy || !online;
-  const knowsEvil = state.me?.role === 'Merlin' || state.me?.team === 'Evil';
-  const knownEvil = new Set(knowsEvil ? (state.me.information?.players || []).map(player => player.id) : []);
+  const knowsSpy = state.me?.role === 'Merlin' || state.me?.team === 'Spy';
+  const knownSpy = new Set(knowsSpy ? (state.me.information?.players || []).map(player => player.id) : []);
   const merlinCandidates = new Set(state.me?.role === 'Percival' ? (state.me.information?.players || []).map(player => player.id) : []);
   const seats = Array.from({ length: state.capacity }, (_, index) => {
     const player = state.players[index];
@@ -93,7 +93,7 @@ function render() {
       return row;
     }
     row.classList.toggle('is-me', player.id === state.me?.id);
-    row.classList.toggle('known-evil', knownEvil.has(player.id));
+    row.classList.toggle('known-spy', knownSpy.has(player.id));
     row.classList.toggle('merlin-candidate', merlinCandidates.has(player.id));
     avatar.textContent = player.name.split(/\s+/).map(part => Array.from(part)[0]).slice(0, 2).join('').toUpperCase();
     name.textContent = player.name + (player.id === state.me?.id ? ' (you)' : '');
@@ -105,8 +105,8 @@ function render() {
     if (player.id === state.hostId) {
       const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
     }
-    if (knownEvil.has(player.id)) {
-      const badge = document.createElement('span'); badge.className = 'evil-badge'; badge.textContent = 'Spy'; meta.append(badge);
+    if (knownSpy.has(player.id)) {
+      const badge = document.createElement('span'); badge.className = 'spy-badge'; badge.textContent = 'Spy'; meta.append(badge);
     }
     if (merlinCandidates.has(player.id)) {
       const badge = document.createElement('span'); badge.className = 'merlin-badge'; badge.textContent = 'merlin?'; meta.append(badge);

@@ -38,9 +38,9 @@ h1, h2, h3, p { margin: 0; }
 .player-offline { color: #986447; }
 .host-badge { color: #8d692a; background: #f4ecd9; border-radius: 3px; padding: 2px 5px; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
 #players > li.is-me { border-color: #b9a16e; background: #fcfaf4; }
-#players > li.known-evil { border-color: #e2b5af; background: #fff0ed; }
-.known-evil .avatar { background: #f2d6d1; color: #a15a50; }
-.evil-badge { color: #974b40; background: #f6dcd7; border-radius: 3px; padding: 2px 5px; font-size: 9px; white-space: nowrap; }
+#players > li.known-spy { border-color: #e2b5af; background: #fff0ed; }
+.known-spy .avatar { background: #f2d6d1; color: #a15a50; }
+.spy-badge { color: #974b40; background: #f6dcd7; border-radius: 3px; padding: 2px 5px; font-size: 9px; white-space: nowrap; }
 #players > li.merlin-candidate { border-color: #aec9e2; background: #edf5ff; }
 .merlin-candidate .avatar { background: #d6e7f7; color: #476f98; }
 .merlin-badge { color: #365f88; background: #d8e9fa; border-radius: 3px; padding: 2px 5px; font-size: 9px; white-space: nowrap; }
@@ -59,7 +59,7 @@ h1, h2, h3, p { margin: 0; }
 .setup-content { padding: 18px; }
 .role-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .role-chip { border-radius: 4px; padding: 6px 8px; background: #eff4f7; color: #486b81; font-size: 11px; border: 1px solid #dbe6ed; }
-.role-chip[data-team="Evil"] { background: #f9efed; color: #a4695f; border-color: #eedbd7; }
+.role-chip[data-team="Spy"] { background: #f9efed; color: #a4695f; border-color: #eedbd7; }
 .role-chip b { margin-left: 5px; }
 summary { cursor: pointer; font-weight: 600; font-size: 12px; color: #4e616c; }
 details { margin-top: 18px; border-top: 1px solid #e4e9eb; padding-top: 14px; }
@@ -71,18 +71,18 @@ select { width: 100%; padding: 7px; font-size: 12px; }
 .role-input-row input { width: 57px; padding: 5px 7px; }
 .role-input-row label { display: flex; align-items: center; gap: 7px; }
 .role-input-row label::before { content: ''; width: 5px; height: 5px; background: #7197ad; border-radius: 50%; }
-.role-input-row[data-team="Evil"] label::before { background: #bc8379; }
+.role-input-row[data-team="Spy"] label::before { background: #bc8379; }
 #setup-validation { margin: 12px 0; font-size: 11px; }
 #save-setup { width: 100%; min-height: 34px; font-size: 12px; }
 .rules-help dl { margin-bottom: 12px; font-size: 12px; line-height: 1.5; }
 .rules-help dt { font-weight: 600; margin-top: 12px; }
 .rules-help dd { color: #718087; margin: 3px 0; }
 .private-panel { border-top: 1px solid #dce4e7; padding: 22px; background: #f4f8fa; }
-.private-panel[data-team="Evil"] { background: #fbf4f2; }
+.private-panel[data-team="Spy"] { background: #fbf4f2; }
 .role-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .eyebrow { font-size: 9px; letter-spacing: .1em; color: #7b8b93; font-weight: 650; }
 #role { font: 28px Georgia, serif; margin-top: 6px; color: #3d5d70; }
-.private-panel[data-team="Evil"] #role { color: #a36559; }
+.private-panel[data-team="Spy"] #role { color: #a36559; }
 #information-heading { font-size: 12px; font-weight: 600; margin-top: 20px; }
 #information-players { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 7px; }
 #information-players li { font-size: 12px; border: 1px solid #d6e1e7; background: #fff; border-radius: 4px; padding: 7px 10px; overflow-wrap: anywhere; }

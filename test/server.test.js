@@ -210,10 +210,10 @@ test('only the host can configure roles; invalid setups and shrinking an occupie
     const config = preset(); config.counts.Merlin = value; invalid.push(config);
   }
   const extra = preset(); extra.counts.FakeRole = 0; invalid.push(extra);
-  const wrongBalance = preset(); wrongBalance.counts.Resistance--; wrongBalance.counts.Minion++; invalid.push(wrongBalance);
+  const wrongBalance = preset(); wrongBalance.counts.Resistance--; wrongBalance.counts.Spy++; invalid.push(wrongBalance);
   const duplicate = preset(10); duplicate.counts.Percival++; duplicate.counts.Resistance--; invalid.push(duplicate);
   const missing = preset(); missing.counts.Merlin = 0; missing.counts.Resistance++; invalid.push(missing);
-  const weakFive = preset(5); weakFive.counts.Morgana = 0; weakFive.counts.Minion++; invalid.push(weakFive);
+  const weakFive = preset(5); weakFive.counts.Morgana = 0; weakFive.counts.Spy++; invalid.push(weakFive);
   const sixteen = preset(15); sixteen.counts.Resistance++; invalid.push(sixteen);
   const oneTeam = { mode: 'custom', counts: { ...emptyCounts(), Resistance: 5 } }; invalid.push(oneTeam);
   for (const config of invalid) {
@@ -232,7 +232,7 @@ test('all eight roles receive exactly their allowed starting knowledge, and no o
   const { client } = await setup(t);
   const host = client();
   await host.call('/api/join', { name: 'Host' });
-  const counts = { ...emptyCounts(), Resistance: 3, Merlin: 1, Percival: 1, Assassin: 1, Morgana: 1, Mordred: 1, Oberon: 1, Minion: 1 };
+  const counts = { ...emptyCounts(), Resistance: 3, Merlin: 1, Percival: 1, Assassin: 1, Morgana: 1, Mordred: 1, Oberon: 1, Spy: 1 };
   assert.equal((await host.call('/api/config', { mode: 'custom', counts })).status, 200);
   const clients = [host];
   for (let i = 1; i < 10; i++) {
@@ -243,8 +243,8 @@ test('all eight roles receive exactly their allowed starting knowledge, and no o
   const all = states.map(s => s.me);
   for (let i = 0; i < clients.length; i++) {
     const me = all[i];
-    const evil = ['Minion', 'Assassin', 'Morgana', 'Mordred', 'Oberon'];
-    assert.equal(me.team, evil.includes(me.role) ? 'Evil' : 'Good');
+    const evil = ['Spy', 'Assassin', 'Morgana', 'Mordred', 'Oberon'];
+    assert.equal(me.team, evil.includes(me.role) ? 'Spy' : 'Resistance');
     let expected = [];
     if (me.role === 'Merlin') expected = all.filter(p => evil.includes(p.role) && p.role !== 'Mordred');
     else if (me.role === 'Percival') expected = all.filter(p => ['Merlin', 'Morgana'].includes(p.role));
@@ -261,7 +261,7 @@ test('standard Percival without Morgana sees Merlin; custom repeated roles work 
   const { client } = await setup(t);
   const host = client();
   await host.call('/api/join', { name: 'Host' });
-  const config = preset(6); config.counts.Morgana = 0; config.counts.Minion = 1;
+  const config = preset(6); config.counts.Morgana = 0; config.counts.Spy = 1;
   assert.equal((await host.call('/api/config', config)).status, 200);
   const clients = [host];
   for (let i = 1; i < 6; i++) { const c = client(); await c.call('/api/join', { name: `P${i}` }); clients.push(c); }
@@ -313,7 +313,7 @@ test('opt-in Percival demo has four persistent NPCs and reserves Percival for la
   assert.equal((await player.call('/api/kick', { playerId: initial.players[0].id })).status, 409);
   const started = (await player.call('/api/start')).data;
   assert.equal(started.me.role, 'Percival');
-  assert.equal(started.me.team, 'Good');
+  assert.equal(started.me.team, 'Resistance');
   assert.equal(started.me.information.heading, 'Possible Merlins');
   assert.ok(started.me.information.players.every(p => !('role' in p)));
   assert.equal(started.me.information.players.length, 2);

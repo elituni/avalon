@@ -19,9 +19,9 @@ export function startingInformation(me, players) {
   let heading = 'No players revealed';
   let explanation = 'Your role gives you no information about other players.';
   if (me.role === 'Merlin') {
-    visible = players.filter(p => ROLE_INFO[p.role].team === 'Evil' && p.role !== 'Mordred');
-    heading = 'Known Evil players';
-    explanation = 'Mordred is hidden from you. These players are Evil; their exact roles are not revealed.';
+    visible = players.filter(p => ROLE_INFO[p.role].team === 'Spy' && p.role !== 'Mordred');
+    heading = 'Known spies';
+    explanation = 'Mordred is hidden from you. These players are spies; their exact roles are not revealed.';
   } else if (me.role === 'Percival') {
     visible = players.filter(p => p.role === 'Merlin' || p.role === 'Morgana');
     heading = 'Possible Merlins';
@@ -34,10 +34,10 @@ export function startingInformation(me, players) {
       explanation = 'No Merlin is in this custom setup, so every revealed player is Morgana.';
     }
   } else if (me.role === 'Oberon') {
-    explanation = 'You are Evil, but you do not see your teammates and they do not see you. Merlin can see you.';
-  } else if (ROLE_INFO[me.role].team === 'Evil') {
-    visible = players.filter(p => p.id !== me.id && ROLE_INFO[p.role].team === 'Evil' && p.role !== 'Oberon');
-    heading = 'Known Evil teammates';
+    explanation = 'You are a spy, but you do not see your teammates and they do not see you. Merlin can see you.';
+  } else if (ROLE_INFO[me.role].team === 'Spy') {
+    visible = players.filter(p => p.id !== me.id && ROLE_INFO[p.role].team === 'Spy' && p.role !== 'Oberon');
+    heading = 'Known spy teammates';
     explanation = 'Oberon is hidden from your team. Exact teammate roles are not revealed.';
   }
   // Preserve public seat order, never group or sort candidates by their hidden roles.
