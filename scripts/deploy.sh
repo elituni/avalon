@@ -24,7 +24,7 @@ cat > "$staging/rsync-ssh" <<'SSH'
 exec ssh -F "$AVALON_RSYNC_SSH_CONFIG" -o BatchMode=yes -o ConnectTimeout=10 "$@"
 SSH
 chmod +x "$staging/rsync-ssh"
-rsync -az --exclude=rsync-ssh -e "$staging/rsync-ssh" "$staging/" "$target:/opt/avalon/releases/$release/"
+rsync -az --chmod=D755,F644 --exclude=rsync-ssh -e "$staging/rsync-ssh" "$staging/" "$target:/opt/avalon/releases/$release/"
 ssh "${ssh_args[@]}" "$target" bash -s -- "$release" <<'REMOTE'
 set -euo pipefail
 release="/opt/avalon/releases/$1"
@@ -37,7 +37,7 @@ systemctl daemon-reload
 systemctl enable avalon
 systemctl restart avalon
 for attempt in {1..15}; do
-  if systemctl is-active --quiet avalon && curl -fsS http://127.0.0.1:3000/api/count; then
+  if systemctl is-active --quiet avalon && curl --max-time 3 -fsS http://127.0.0.1:3000/api/count; then
     printf '\nDeployed revision: '
     cat "$release/REVISION"
     exit 0
