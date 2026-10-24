@@ -447,3 +447,67 @@ test('demo host can kick NPCs, transfer to humans, and all humans can leave the 
   assert.equal(final.connectedCount, 2);
   assert.ok(final.players.every(p => p.npc));
 });
+
+test('lovers see only the opposite lover role, including repeated and unpaired setups', async t => {
+  const { emptyCounts } = await import('../public/roles.js');
+  const { startingInformation } = await import('../server.js');
+  const { client } = await setup(t);
+  const host = client();
+  await host.call('/api/join', { name: 'Host' });
+  const counts = { ...emptyCounts(), Tristan: 2, Isolde: 2, Merlin: 1, Spy: 1 };
+  assert.equal((await host.call('/api/config', { mode: 'custom', counts })).status, 200);
+  const clients = [host];
+  for (let i = 1; i < 6; i++) {
+    const c = client(); await c.call('/api/join', { name: `Player ${i}` }); clients.push(c);
+  }
+  await host.call('/api/start');
+  const states = await Promise.all(clients.map(async c => (await c.call()).data));
+  const all = states.map(s => s.me);
+  for (const me of all) {
+    const partner = me.role === 'Tristan' ? 'Isolde' : me.role === 'Isolde' ? 'Tristan' : null;
+    const expected = partner ? all.filter(p => p.role === partner) : me.role === 'Merlin' ? all.filter(p => p.role === 'Spy') : [];
+    assert.deepEqual(me.information.players, expected.map(p => ({ id: p.id, name: p.name })));
+    if (partner) assert.equal(me.team, 'Resistance');
+  }
+  const observer = (await client().call()).data;
+  assert.equal(observer.me, null);
+  for (const p of observer.players) assert.deepEqual(Object.keys(p).sort(), ['connected', 'id', 'name', 'npc']);
+  for (const role of ['Tristan', 'Isolde']) {
+    assert.deepEqual(startingInformation({ id: 'alone', role }, [{ id: 'alone', role }]).players, []);
+  }
+});
+
+test('card setup is host-only, validated, public, locked on start and cleared on reset', async t => {
+  const { preset } = await import('../public/roles.js');
+  const { six, client } = await setup(t);
+  const players = await six();
+  const config = preset();
+  config.cards = { ladyOfTheLake: true, refOfTheRain: true, excalibur: true };
+  assert.equal((await players[1].call('/api/config', config)).status, 403);
+  for (const invalid of [null, [], 'ladyOfTheLake', { fake: true }, { excalibur: 1 }]) {
+    assert.equal((await players[0].call('/api/config', { ...config, cards: invalid })).status, 400);
+  }
+  const saved = await players[0].call('/api/config', config);
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.data.cards, []);
+  assert.equal(saved.data.leaderId, null);
+  assert.deepEqual((await client().call()).data.config.cards, config.cards);
+  const started = (await players[0].call('/api/start')).data;
+  const leaderIndex = started.players.findIndex(p => p.id === started.leaderId);
+  assert.ok(leaderIndex >= 0);
+  const holderId = started.players[(leaderIndex + 1) % 6].id;
+  assert.deepEqual(started.cards, [
+    { id: 'ladyOfTheLake', holderId },
+    { id: 'refOfTheRain', holderId },
+    { id: 'excalibur', holderId: null },
+  ]);
+  assert.deepEqual((await client().call()).data.cards, started.cards);
+  assert.deepEqual((await players[0].call()).data.cards, started.cards);
+  assert.equal((await players[0].call('/api/config', preset())).status, 409);
+  const reset = (await players[0].call('/api/reset')).data;
+  assert.equal(reset.leaderId, null);
+  assert.deepEqual(reset.cards, []);
+  assert.deepEqual(reset.config, config);
+  await players[0].call('/api/config', preset());
+  assert.deepEqual((await players[0].call('/api/start')).data.cards, []);
+});

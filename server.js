@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { ROLE_INFO, preset, totals, validateConfig } from './public/roles.js';
+import { ROLE_INFO, emptyCards, preset, totals, validateConfig } from './public/roles.js';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
@@ -33,6 +33,11 @@ export function startingInformation(me, players) {
       heading = 'Morgana';
       explanation = 'No Merlin is in this custom setup, so every revealed player is Morgana.';
     }
+  } else if (me.role === 'Tristan' || me.role === 'Isolde') {
+    const partner = me.role === 'Tristan' ? 'Isolde' : 'Tristan';
+    visible = players.filter(p => p.role === partner);
+    heading = partner;
+    explanation = `You know every ${partner} in this setup.`;
   } else if (me.role === 'Oberon') {
     explanation = 'You are a spy, but you do not see your teammates and they do not see you. Merlin can see you.';
   } else if (ROLE_INFO[me.role].team === 'Spy') {
@@ -53,6 +58,8 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
   }
   let phase = 'lobby';
   let gameNumber = 0;
+  let leaderId = null;
+  let cards = [];
   let config = preset(demo ? 5 : 6);
   if (demo) {
     // Four-seat UI demo only; normal setups still require at least five players.
@@ -74,6 +81,8 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
     return {
       phase,
       gameNumber,
+      leaderId,
+      cards,
       demo,
       config,
       capacity: totals(config).total,
@@ -177,7 +186,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
               if (player.npc) players.delete(key);
             }
           }
-          config = { mode: proposed.mode, counts: { ...proposed.counts } };
+          config = { mode: proposed.mode, counts: { ...proposed.counts }, cards: { ...emptyCards(), ...proposed.cards } };
         }
         if (path === '/api/start') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can start the game.' });
@@ -194,6 +203,14 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
             const percival = [...players.values()].find(p => p.role === 'Percival');
             if (laze && percival) [laze.role, percival.role] = [percival.role, laze.role];
           }
+          const seats = [...players.values()];
+          const leaderIndex = randomInt(seats.length);
+          leaderId = seats[leaderIndex].id;
+          // ProAvalon starts both information cards one seat after the leader.
+          // Excalibur is assigned with a quest team, not during role dealing.
+          cards = Object.entries(config.cards).filter(([, enabled]) => enabled).map(([id]) => ({
+            id, holderId: id === 'excalibur' ? null : seats[(leaderIndex + 1) % seats.length].id,
+          }));
           phase = 'started';
           gameNumber += 1;
         }
@@ -202,6 +219,8 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           if (phase !== 'started') return send(409, { error: 'The game is already in the lobby.' });
           for (const player of players.values()) delete player.role;
           phase = 'lobby';
+          leaderId = null;
+          cards = [];
         }
         return send(200, snapshot(token));
       }

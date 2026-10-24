@@ -1,4 +1,4 @@
-import { ROLE_INFO, preset, totals, validateConfig } from '/roles.js';
+import { ROLE_INFO, CARD_INFO, preset, totals, validateConfig } from '/roles.js';
 
 const $ = selector => document.querySelector(selector);
 const form = $('#join-form');
@@ -33,10 +33,17 @@ function renderPlayerMenu() {
 
 
 function readDraft() {
-  return { mode: $('#mode').value, counts: Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, Number(document.getElementById(`role-${role}`).value)])) };
+  return { cards: Object.fromEntries(Object.keys(CARD_INFO).map(card => [card, document.getElementById(`card-${card}`).checked])), mode: $('#mode').value, counts: Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, Number(document.getElementById(`role-${role}`).value)])) };
 }
 function fillEditor(config) {
   $('#mode').value = config.mode;
+  $('#card-inputs').replaceChildren(...Object.entries(CARD_INFO).map(([card, info]) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox'; input.id = `card-${card}`; input.checked = Boolean(config.cards?.[card]);
+    label.append(input, info.name);
+    return label;
+  }));
   $('#role-inputs').replaceChildren(...Object.entries(ROLE_INFO).map(([role, info]) => {
     const row = document.createElement('div');
     row.className = 'role-input-row';
@@ -71,6 +78,11 @@ function renderSetup(started) {
     chip.append(role, amount);
     return chip;
   }));
+  for (const [card, info] of Object.entries(CARD_INFO)) {
+    if (!state.config.cards?.[card]) continue;
+    const chip = document.createElement('span'); chip.className = 'role-chip'; chip.textContent = info.name;
+    $('#setup-roles').append(chip);
+  }
   const host = state.me?.id === state.hostId;
   $('#setup-form').hidden = !host || started;
   $('#setup-editor').hidden = !host || started;
@@ -108,6 +120,7 @@ function render() {
   const knowsSpy = informationVisible && (state.me?.role === 'Merlin' || state.me?.team === 'Spy');
   const knownSpy = new Set(knowsSpy ? (state.me.information?.players || []).map(player => player.id) : []);
   const merlinCandidates = new Set(informationVisible && state.me?.role === 'Percival' ? (state.me.information?.players || []).map(player => player.id) : []);
+  const lovers = new Set(informationVisible && ['Tristan', 'Isolde'].includes(state.me?.role) ? (state.me.information?.players || []).map(player => player.id) : []);
   const seats = Array.from({ length: state.capacity }, (_, index) => {
     const player = state.players[index];
     const row = document.createElement('li');
@@ -122,6 +135,7 @@ function render() {
     row.classList.toggle('is-me', player.id === state.me?.id);
     row.classList.toggle('known-spy', knownSpy.has(player.id));
     row.classList.toggle('merlin-candidate', merlinCandidates.has(player.id));
+    row.classList.toggle('known-lover', lovers.has(player.id));
     avatar.textContent = player.name.split(/\s+/).map(part => Array.from(part)[0]).slice(0, 2).join('').toUpperCase();
     name.textContent = player.name + (player.id === state.me?.id ? ' (you)' : '');
     const meta = document.createElement('div'); meta.className = 'player-meta';
@@ -132,11 +146,22 @@ function render() {
     if (player.id === state.hostId) {
       const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
     }
+    if (player.id === state.leaderId) {
+      const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Leader'; meta.append(badge);
+    }
+    for (const card of state.cards || []) {
+      if (card.holderId !== player.id) continue;
+      const badge = document.createElement('span'); badge.className = 'card-badge'; badge.textContent = CARD_INFO[card.id].name; meta.append(badge);
+    }
     if (knownSpy.has(player.id)) {
       const badge = document.createElement('span'); badge.className = 'spy-badge'; badge.textContent = 'Spy'; meta.append(badge);
     }
     if (merlinCandidates.has(player.id)) {
       const badge = document.createElement('span'); badge.className = 'merlin-badge'; badge.textContent = 'merlin?'; meta.append(badge);
+    }
+    if (lovers.has(player.id)) {
+      const badge = document.createElement('span'); badge.className = 'lover-badge';
+      badge.textContent = state.me.role === 'Tristan' ? 'Isolde' : 'Tristan'; meta.append(badge);
     }
     row.append(meta);
     row.dataset.playerId = player.id;
@@ -156,6 +181,9 @@ function render() {
     return row;
   });
   $('#players').replaceChildren(...seats);
+  const excalibur = started && state.config.cards?.excalibur;
+  $('#game-cards').hidden = !excalibur;
+  $('#game-cards').textContent = excalibur ? 'Excalibur · assigned with the quest team' : '';
   $('#role-panel').hidden = !state.me?.role;
   $('#role-panel').dataset.team = informationVisible ? state.me?.team || '' : '';
   $('#role').textContent = informationVisible ? state.me?.role || '??' : '??';
@@ -262,6 +290,11 @@ reset.addEventListener('click', () => update('/api/reset'));
 leave.addEventListener('click', () => update('/api/leave'));
 $('#role-guide').replaceChildren(...Object.entries(ROLE_INFO).flatMap(([role, info]) => {
   const term = document.createElement('dt'); term.textContent = `${role} · ${info.team}`;
+  const description = document.createElement('dd'); description.textContent = info.description;
+  return [term, description];
+}));
+$('#card-guide').replaceChildren(...Object.values(CARD_INFO).flatMap(info => {
+  const term = document.createElement('dt'); term.textContent = info.name;
   const description = document.createElement('dd'); description.textContent = info.description;
   return [term, description];
 }));
