@@ -44,18 +44,23 @@ export function startingInformation(me, players) {
   return { heading, explanation, players: visible.map(p => ({ id: p.id, name: p.name })) };
 }
 
-export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
+export function createGameServer({ now = Date.now, graceMs = 15000, demo = false } = {}) {
   const players = new Map();
+  if (demo) {
+    for (let i = 1; i <= 4; i++) {
+      players.set(randomBytes(32).toString('hex'), { id: randomUUID(), name: `NPC ${i}`, npc: true, lastSeen: now() });
+    }
+  }
   let phase = 'lobby';
-  let config = preset();
+  let config = preset(demo ? 5 : 6);
   let hostId = null;
   const kicked = new Set();
-  const connected = player => now() - player.lastSeen < graceMs;
+  const connected = player => player.npc || now() - player.lastSeen < graceMs;
   const updateHost = () => {
     if (phase !== 'lobby') return;
     const current = [...players.values()].find(p => p.id === hostId);
     if (!current || !connected(current)) {
-      hostId = [...players.values()].find(connected)?.id ?? null;
+      hostId = [...players.values()].find(p => !p.npc && connected(p))?.id ?? null;
     }
   };
   const snapshot = token => {
@@ -63,6 +68,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
     const me = players.get(token);
     return {
       phase,
+      demo,
       config,
       capacity: totals(config).total,
       hostId,
@@ -116,6 +122,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
           try { data = JSON.parse(body); } catch { return send(400, { error: 'Enter a display name.' }); }
           const name = typeof data?.name === 'string' ? data.name.trim().replace(/\s+/g, ' ') : '';
           if (!name || name.length > 24 || /[\u0000-\u001f\u007f]/.test(name)) return send(400, { error: 'Use a name between 1 and 24 characters.' });
+          if (demo && name.toLowerCase() !== 'laze') return send(400, { error: 'Join as laze for this Merlin demo.' });
           // Disconnected seats may be reclaimed before the game starts.
           for (const [key, p] of players) if (!connected(p)) players.delete(key);
           if (players.size >= totals(config).total) return send(409, { error: 'The lobby is full.' });
@@ -132,6 +139,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
         }
         if (path === '/api/host' || path === '/api/kick') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can manage players.' });
+          if (demo) return send(409, { error: 'NPC seats are fixed for this demo.' });
           if (phase !== 'lobby') return send(409, { error: 'The roster is locked for this game.' });
           let data;
           try { data = JSON.parse(body); } catch { return send(400, { error: 'Choose a player.' }); }
@@ -149,6 +157,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
         }
         if (path === '/api/config') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can change the role setup.' });
+          if (demo) return send(409, { error: 'This demo uses five players with laze as Merlin.' });
           if (phase !== 'lobby') return send(409, { error: 'Role setup is locked after the game starts.' });
           let proposed;
           try { proposed = JSON.parse(body); } catch { return send(400, { error: 'Invalid role setup.' }); }
@@ -167,6 +176,11 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
           [...players.values()].forEach((p, i) => { p.role = shuffled[i]; });
+          if (demo) {
+            const laze = [...players.values()].find(p => !p.npc && p.name.toLowerCase() === 'laze');
+            const merlin = [...players.values()].find(p => p.role === 'Merlin');
+            [laze.role, merlin.role] = [merlin.role, laze.role];
+          }
           phase = 'started';
         }
         return send(200, snapshot(token));
@@ -188,7 +202,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 3000);
-  const server = createGameServer();
+  const server = createGameServer({ demo: process.env.AVALON_DEMO === '1' });
   server.on('error', error => { console.error(error.message); process.exitCode = 1; });
   server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`Avalon: http://localhost:${port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close());

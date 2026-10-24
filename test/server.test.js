@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createGameServer } from '../server.js';
 
-async function setup(t) {
+async function setup(t, options = {}) {
   let time = 1000;
-  const server = createGameServer({ now: () => time });
+  const server = createGameServer({ now: () => time, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -292,4 +292,40 @@ test('standard Percival without Morgana sees Merlin; custom repeated roles work 
     if (['Assassin', 'Morgana'].includes(me.role)) assert.equal(me.information.players.length, 4);
   }
   assert.deepEqual(roles, { Assassin: 2, Morgana: 3, Resistance: 5, Merlin: 2, Percival: 3 });
+});
+
+test('opt-in Merlin demo has four persistent NPCs and reserves Merlin for laze', async t => {
+  const { client, advance } = await setup(t, { demo: true });
+  const player = client();
+  const initial = (await player.call()).data;
+  assert.equal(initial.demo, true);
+  assert.equal(initial.capacity, 5);
+  assert.equal(initial.connectedCount, 4);
+  assert.equal(initial.hostId, null);
+  assert.deepEqual(initial.players.map(p => p.name), ['NPC 1', 'NPC 2', 'NPC 3', 'NPC 4']);
+  advance(60000);
+  assert.equal((await player.call()).data.connectedCount, 4);
+  assert.equal((await player.call('/api/join', { name: 'Someone else' })).status, 400);
+  const joined = (await player.call('/api/join', { name: 'laze' })).data;
+  assert.equal(joined.hostId, joined.me.id);
+  assert.equal(joined.connectedCount, 5);
+  assert.equal((await player.call('/api/config', joined.config)).status, 409);
+  assert.equal((await player.call('/api/kick', { playerId: initial.players[0].id })).status, 409);
+  const started = (await player.call('/api/start')).data;
+  assert.equal(started.me.role, 'Merlin');
+  assert.equal(started.me.team, 'Good');
+  assert.equal(started.me.information.players.length, 2);
+  assert.ok(started.me.information.players.every(p => p.name.startsWith('NPC ')));
+  assert.equal((await client(player.cookie).call()).data.me.role, 'Merlin');
+  assert.equal((await client().call()).data.me, null);
+});
+
+test('normal games do not seed NPCs or enable demo restrictions', async t => {
+  const { client } = await setup(t);
+  const player = client();
+  const state = (await player.call()).data;
+  assert.equal(state.demo, false);
+  assert.equal(state.capacity, 6);
+  assert.deepEqual(state.players, []);
+  assert.equal((await player.call('/api/join', { name: 'Anyone' })).status, 200);
 });

@@ -45,14 +45,14 @@ function validateDraft() {
 }
 function renderSetup(started) {
   const counts = totals(state.config);
-  $('#setup-summary').textContent = `${state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Good} Good / ${counts.Evil} Evil`;
+  $('#setup-summary').textContent = `${state.demo ? 'Merlin demo' : state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Good} Good / ${counts.Evil} Evil`;
   $('#setup-roles').replaceChildren(...Object.entries(state.config.counts).filter(([, n]) => n).map(([role, n]) => {
     const chip = document.createElement('span'); chip.className = 'role-chip'; chip.dataset.team = ROLE_INFO[role].team;
     const amount = document.createElement('b'); amount.textContent = `×${n}`;
     chip.append(role, amount);
     return chip;
   }));
-  const host = state.me?.id === state.hostId;
+  const host = state.me?.id === state.hostId && !state.demo;
   $('#setup-form').hidden = !host || started;
   $('#setup-editor').hidden = !host || started;
   const key = JSON.stringify([state.hostId, state.config]);
@@ -72,6 +72,7 @@ function render() {
   const started = state.phase === 'started';
   $('#lobby-count').textContent = `${state.connectedCount} / ${state.capacity} online`;
   form.hidden = joined || started;
+  if (state.demo && !joined && !$('#name').value) $('#name').value = 'laze';
   $('#join').disabled = busy || !online || state.connectedCount >= state.capacity;
   start.hidden = !joined || started;
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
@@ -100,7 +101,7 @@ function render() {
       const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
     }
     row.append(meta);
-    if (!started && state.me?.id === state.hostId && player.id !== state.me.id) {
+    if (!state.demo && !started && state.me?.id === state.hostId && player.id !== state.me.id) {
       const controls = document.createElement('div'); controls.className = 'player-controls';
       for (const [label, endpoint] of [['Make host', '/api/host'], ['Kick', '/api/kick']]) {
         const control = document.createElement('button');
