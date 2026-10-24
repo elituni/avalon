@@ -47,3 +47,6 @@ input:focus-visible { outline: 3px solid #a78950; outline-offset: 2px; }
 .secondary:hover:not(:disabled) { background: #eef2e8; }
 #feedback { color: #9e3c29; }
 #feedback:empty { display: none; }
+.player-controls { display: flex; gap: 8px; width: 100%; }
+.player-controls .secondary { width: auto; margin: 0; padding: 0 12px; min-height: 34px; }
+#players li { flex-wrap: wrap; }

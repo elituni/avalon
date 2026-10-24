@@ -16,11 +16,23 @@ const roles = ['Resistance', 'Resistance', 'Merlin', 'Morgana', 'Assassin', 'Per
 export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
   const players = new Map();
   let phase = 'lobby';
+  let hostId = null;
+  const kicked = new Set();
   const connected = player => now() - player.lastSeen < graceMs;
+  const updateHost = () => {
+    if (phase !== 'lobby') return;
+    const current = [...players.values()].find(p => p.id === hostId);
+    if (!current || !connected(current)) {
+      hostId = [...players.values()].find(connected)?.id ?? null;
+    }
+  };
   const snapshot = token => {
+    updateHost();
     const me = players.get(token);
     return {
       phase,
+      hostId,
+      kicked: kicked.has(token),
       connectedCount: [...players.values()].filter(connected).length,
       players: [...players.values()].map(p => ({ id: p.id, name: p.name, connected: connected(p) })),
       me: me ? { id: me.id, name: me.name, role: me.role ?? null } : null,
@@ -38,7 +50,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
       const path = req.url.split('?')[0];
       if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true });
       if (path.startsWith('/api/')) {
-        const methods = { '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/leave': 'POST' };
+        const methods = { '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/leave': 'POST', '/api/host': 'POST', '/api/kick': 'POST' };
         if (!methods[path]) return send(404, { error: 'Not found' });
         if (req.method !== methods[path]) {
           res.setHeader('Allow', methods[path]);
@@ -58,6 +70,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
           body += chunk;
           if (Buffer.byteLength(body) > 2048) return send(413, { error: 'Request too large' });
         }
+        updateHost();
         const me = players.get(token);
         if (path === '/api/join') {
           if (me) {
@@ -74,6 +87,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
           if (players.size >= 6) return send(409, { error: 'The lobby is full.' });
           if ([...players.values()].some(p => p.name.toLowerCase() === name.toLowerCase())) return send(409, { error: 'That name is already taken.' });
           players.set(token, { id: randomUUID(), name, lastSeen: now() });
+          kicked.delete(token);
         }
         if (path === '/api/heartbeat') {
           if (me) me.lastSeen = now();
@@ -81,6 +95,23 @@ export function createGameServer({ now = Date.now, graceMs = 15000 } = {}) {
         if (path === '/api/leave') {
           if (phase !== 'lobby') return send(409, { error: 'The roster is locked for this game.' });
           players.delete(token);
+        }
+        if (path === '/api/host' || path === '/api/kick') {
+          if (!me || me.id !== hostId) return send(403, { error: 'Only the host can manage players.' });
+          if (phase !== 'lobby') return send(409, { error: 'The roster is locked for this game.' });
+          let data;
+          try { data = JSON.parse(body); } catch { return send(400, { error: 'Choose a player.' }); }
+          const target = [...players.entries()].find(([, p]) => p.id === data?.playerId);
+          if (!target) return send(404, { error: 'That player is no longer in the lobby.' });
+          const [targetToken, player] = target;
+          if (player.id === me.id) return send(400, { error: 'Choose another player. Use Leave lobby to leave.' });
+          if (path === '/api/host') {
+            if (!connected(player)) return send(409, { error: 'Choose a connected player to host.' });
+            hostId = player.id;
+          } else {
+            players.delete(targetToken);
+            kicked.add(targetToken);
+          }
         }
         if (path === '/api/start') {
           if (!me) return send(403, { error: 'Join the lobby first.' });

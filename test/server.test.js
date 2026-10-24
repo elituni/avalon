@@ -123,3 +123,71 @@ test('validates names, methods and origin, and serves assets without exposing so
   const state = await client().call();
   assert.equal(state.headers.get('cache-control'), 'no-store');
 });
+
+test('first joined player hosts; only host can transfer or kick, including stale requests', async t => {
+  const { client } = await setup(t);
+  const observer = client();
+  await observer.call();
+  const host = client();
+  const first = (await host.call('/api/join', { name: 'Host' })).data;
+  const guest = client();
+  const second = (await guest.call('/api/join', { name: 'Guest' })).data;
+  assert.equal(first.hostId, first.me.id);
+  assert.equal(second.hostId, first.me.id);
+  assert.equal((await client(host.cookie).call()).data.hostId, first.me.id);
+  for (const action of ['/api/host', '/api/kick']) {
+    assert.equal((await observer.call(action, { playerId: first.me.id })).status, 403);
+    assert.equal((await guest.call(action, { playerId: first.me.id })).status, 403);
+    assert.equal((await host.call(action, { playerId: first.me.id })).status, 400);
+    assert.equal((await host.call(action, { playerId: 'missing' })).status, 404);
+  }
+  const transferred = await host.call('/api/host', { playerId: second.me.id });
+  assert.equal(transferred.data.hostId, second.me.id);
+  assert.equal((await host.call('/api/kick', { playerId: second.me.id })).status, 403);
+  assert.equal((await guest.call('/api/kick', { playerId: first.me.id })).status, 200);
+  const removed = (await host.call('/api/heartbeat')).data;
+  assert.equal(removed.me, null);
+  assert.equal(removed.kicked, true);
+  assert.equal(removed.connectedCount, 1);
+  assert.equal((await client(host.cookie).call()).data.me, null);
+  const rejoined = (await host.call('/api/join', { name: 'Returning' })).data;
+  assert.equal(rejoined.kicked, false);
+  assert.equal(rejoined.hostId, second.me.id);
+  assert.notEqual(rejoined.me.id, first.me.id);
+});
+
+test('host passes to earliest connected player on leave or timeout, never stolen on reconnect', async t => {
+  const { client, advance } = await setup(t);
+  const a = client(), b = client(), c = client();
+  const aid = (await a.call('/api/join', { name: 'A' })).data.me.id;
+  const bid = (await b.call('/api/join', { name: 'B' })).data.me.id;
+  const cid = (await c.call('/api/join', { name: 'C' })).data.me.id;
+  advance(14000);
+  await b.call('/api/heartbeat');
+  await c.call('/api/heartbeat');
+  assert.equal((await b.call()).data.hostId, aid);
+  advance(1001);
+  assert.equal((await b.call()).data.hostId, bid);
+  assert.equal((await b.call('/api/host', { playerId: aid })).status, 409);
+  assert.equal((await a.call('/api/heartbeat')).data.hostId, bid);
+  assert.equal((await b.call('/api/leave')).data.hostId, aid);
+  assert.equal((await a.call('/api/leave')).data.hostId, cid);
+  assert.equal((await c.call('/api/leave')).data.hostId, null);
+  assert.equal((await a.call('/api/join', { name: 'Fresh' })).data.hostId, (await a.call()).data.me.id);
+});
+
+test('kick updates readiness and host controls cannot change a started roster', async t => {
+  const { six, client } = await setup(t);
+  const players = await six();
+  const snapshots = await Promise.all(players.map(async c => ({ c, state: (await c.call()).data })));
+  const host = snapshots.find(p => p.state.me.id === p.state.hostId);
+  const other = snapshots.find(p => p !== host);
+  const kicked = await host.c.call('/api/kick', { playerId: other.state.me.id });
+  assert.equal(kicked.data.connectedCount, 5);
+  assert.equal((await host.c.call('/api/start')).status, 409);
+  const newcomer = client();
+  const target = (await newcomer.call('/api/join', { name: 'Replacement' })).data.me.id;
+  assert.equal((await host.c.call('/api/start')).status, 200);
+  for (const action of ['/api/kick', '/api/host']) assert.equal((await host.c.call(action, { playerId: target })).status, 409);
+  assert.equal((await host.c.call()).data.players.length, 6);
+});

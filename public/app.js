@@ -23,11 +23,26 @@ function render() {
   $('#players').replaceChildren(...state.players.map(player => {
     const row = document.createElement('li');
     const name = document.createElement('span');
-    name.textContent = player.name + (player.id === state.me?.id ? ' (you)' : '');
+    name.textContent = player.name + (player.id === state.me?.id ? ' (you)' : '') + (player.id === state.hostId ? ' · Host' : '');
     const status = document.createElement('span');
     status.className = player.connected ? 'player-online' : 'player-offline';
     status.textContent = player.connected ? 'Connected' : 'Disconnected';
     row.append(name, status);
+    if (!started && state.me?.id === state.hostId && player.id !== state.me.id) {
+      const controls = document.createElement('div');
+      controls.className = 'player-controls';
+      for (const [label, endpoint] of [['Make host', '/api/host'], ['Kick', '/api/kick']]) {
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.className = 'secondary';
+        control.textContent = label;
+        control.setAttribute('aria-label', `${label}: ${player.name}`);
+        control.disabled = busy || !online || (endpoint === '/api/host' && !player.connected);
+        control.addEventListener('click', () => update(endpoint, { playerId: player.id }));
+        controls.append(control);
+      }
+      row.append(controls);
+    }
     return row;
   }));
   $('#role-panel').hidden = !state.me?.role;
@@ -36,6 +51,7 @@ function render() {
   $('#hint').textContent = started
     ? joined ? 'Roles assigned. The roster is locked.' : 'This game has started. The roster is locked.'
     : joined ? state.connectedCount === 6 ? 'Everyone is here. Any player can start.' : `Waiting for ${6 - state.connectedCount} more connected player${state.connectedCount === 5 ? '' : 's'}.`
+    : state.kicked ? 'The host removed you from the lobby. You can join again if there is a seat.'
     : state.connectedCount === 6 ? 'The lobby is full.' : 'Enter your name to take a seat.';
 }
 

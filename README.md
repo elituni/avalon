@@ -12,6 +12,10 @@ npm start
 
 Open http://localhost:3000. Enter a unique display name and join. Exactly six connected players are required to start; any joined player may start. The server randomly deals two Resistance roles and one each of Merlin, Morgana, Assassin, and Percival. Each browser receives only its own role.
 
+The first player to join becomes the host (viewing the page alone does not take a seat). The host can transfer hosting to another connected player or kick someone from the lobby. These controls are enforced by the server and unavailable after roles are dealt. Any joined player can still start when all six are connected.
+
+If the host leaves or exceeds the 15-second disconnect grace period, hosting passes to the earliest joined connected player. Reconnecting does not reclaim hosting. Kicking removes a seat from all of that player’s tabs; it is not a ban, and the player may explicitly join again if space is available.
+
 A browser session cookie identifies a player across tabs and refreshes. To test six players, use six separate browser profiles or devices (ordinary tabs share one seat). Private windows from the same browser may also share cookies.
 
 Browsers send heartbeats every three seconds. A player is disconnected after 15 seconds without one, including when a device sleeps or the browser suspends background tabs. Before starting, disconnected seats can be reclaimed by new players. Players can also explicitly leave the lobby. After starting, the roster is locked and reconnecting restores the original role.
@@ -22,7 +26,7 @@ State is held in one server process. Restarting or deploying clears the lobby an
 npm test
 ```
 
-Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, and fresh-server reset.
+Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, fresh-server reset, host permissions, transfers, kicks, and automatic host succession.
 
 ## Configuration
 
