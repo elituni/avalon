@@ -3,64 +3,69 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#132b25">
-    <title>Avalon · Game night</title>
+    <meta name="theme-color" content="#20282c">
+    <title>Avalon · Game room</title>
     <link rel="stylesheet" href="/style.css">
     <script src="/app.js" type="module"></script>
   </head>
   <body>
-    <header><a class="wordmark" href="/">AVALON<span class="star" aria-hidden="true">✦</span></a><span class="edition">THE FIRST QUEST / 001</span></header>
-    <main>
-      <p class="eyebrow">A SEAT AT THE SAME TABLE</p>
-      <h1>Gather your allies.<br>Keep your secret.</h1>
-      <p class="intro">Join your friends at the table. The host chooses the roles. When every seat is filled, start to discover your role and secret information.</p>
-      <section class="counter-card" aria-label="Game lobby">
-        <div class="card-top"><span id="lobby-count">0 / 6 CONNECTED</span><span id="connection" role="status" data-state="connecting">Connecting…</span></div>
-        <form id="join-form" hidden>
-          <label for="name">Your name</label>
-          <input id="name" name="name" maxlength="24" required autocomplete="nickname" placeholder="What should we call you?">
-          <button id="join" type="submit" disabled>Join game <span aria-hidden="true">＋</span></button>
+    <header class="topbar">
+      <a class="wordmark" href="/">AVALON <span aria-hidden="true">✦</span></a>
+      <span class="room-label">GAME ROOM</span>
+      <span id="connection" role="status" data-state="connecting">Connecting…</span>
+    </header>
+    <main class="room-layout">
+      <section class="table-panel panel" aria-labelledby="table-title">
+        <div class="panel-heading"><h1 id="table-title">The table</h1><span id="lobby-count" class="badge">0 / 6 online</span></div>
+        <form id="join-form" class="join-bar" hidden>
+          <label class="sr-only" for="name">Your name</label>
+          <input id="name" name="name" maxlength="24" required autocomplete="nickname" placeholder="Your name">
+          <button id="join" type="submit" disabled>Join table</button>
         </form>
-        <section class="setup-panel" aria-label="Role setup">
-          <h2>At this table</h2>
-          <p id="setup-summary" class="feedback"></p>
-          <p id="setup-roles" class="footnote"></p>
-          <form id="setup-form" hidden>
-            <label for="preset">Load a preset</label>
-            <select id="preset">
-              <option value="">Choose a preset…</option>
-              <option value="5">5 players</option><option value="6">6 players</option>
-              <option value="7">7 players</option><option value="8">8 players</option>
-              <option value="9">9 players</option><option value="10">10 players</option>
-              <option value="15">15 players · custom example</option>
-            </select>
-            <label for="mode">Setup mode</label>
-            <select id="mode"><option value="standard">Standard · 5–10 players</option><option value="custom">Custom · 5–15 players</option></select>
-            <p class="footnote">Standard uses the usual team balance and one of each special role. Custom allows repeated roles and different team sizes.</p>
-            <div id="role-inputs"></div>
-            <p id="setup-validation" class="feedback" role="status"></p>
-            <button id="save-setup" type="submit">Save role setup</button>
-          </form>
-        </section>
         <ul id="players" aria-label="Players"></ul>
-        <div id="role-panel" hidden>
-          <p class="eyebrow">FOR YOUR EYES ONLY</p>
-          <h2 id="role"></h2>
-          <p id="team"></p>
-          <p id="role-description" class="footnote"></p>
-          <h3 id="information-heading"></h3>
-          <p id="information-explanation" class="footnote"></p>
-          <ul id="information-players" aria-label="Your starting information"></ul>
-          <p class="footnote">Keep your role secret. Your assignment stays the same if you refresh.</p>
+        <div class="table-actions">
+          <p id="hint" class="muted">Connecting…</p>
+          <div class="action-buttons">
+            <button id="leave" class="secondary" type="button" hidden>Leave</button>
+            <button id="start" type="button" hidden disabled>Start game <span aria-hidden="true">→</span></button>
+          </div>
         </div>
-        <button id="start" type="button" hidden disabled>Start game <span aria-hidden="true">→</span></button>
-        <p id="hint" class="feedback">Connecting to the table…</p>
-        <p id="feedback" class="feedback" role="status"></p>
-        <button id="leave" class="secondary" type="button" hidden>Leave lobby</button>
+        <p id="feedback" class="error" role="status"></p>
+        <section id="role-panel" class="private-panel" hidden aria-label="Your private role">
+          <div class="role-heading"><div><p class="eyebrow">YOUR ROLE · PRIVATE</p><h2 id="role"></h2></div><span id="team" class="badge"></span></div>
+          <h3 id="information-heading"></h3>
+          <ul id="information-players" aria-label="Your starting information"></ul>
+          <details class="role-help"><summary>Role details</summary><p id="role-description"></p><p id="information-explanation"></p></details>
+        </section>
       </section>
-      <p class="footnote">Your role and starting information are for your eyes only.</p>
+      <aside class="setup-panel panel" aria-labelledby="setup-title">
+        <div class="panel-heading"><h2 id="setup-title">Game setup</h2></div>
+        <div class="setup-content">
+          <p id="setup-summary" class="muted"></p>
+          <div id="setup-roles" class="role-chips" aria-label="Selected roles"></div>
+          <details id="setup-editor" hidden>
+            <summary>Edit roles</summary>
+            <form id="setup-form" hidden>
+              <div class="select-row">
+                <label for="preset">Preset</label>
+                <select id="preset">
+                  <option value="">Choose…</option>
+                  <option value="5">5 players</option><option value="6">6 players</option>
+                  <option value="7">7 players</option><option value="8">8 players</option>
+                  <option value="9">9 players</option><option value="10">10 players</option>
+                  <option value="15">15 players · custom</option>
+                </select>
+              </div>
+              <div class="select-row"><label for="mode">Mode</label><select id="mode"><option value="standard">Standard</option><option value="custom">Custom</option></select></div>
+              <div id="role-inputs"></div>
+              <p id="setup-validation" class="muted" role="status"></p>
+              <button id="save-setup" type="submit">Save setup</button>
+            </form>
+          </details>
+          <details class="rules-help"><summary>Role guide</summary><dl id="role-guide"></dl><p class="muted">Standard: 5–10 players. Custom: up to 15, including repeated roles.</p></details>
+        </div>
+      </aside>
       <noscript>Enable JavaScript to join the game.</noscript>
     </main>
-    <footer><span>A small beginning for game night.</span><span>AVALON PROTOTYPE</span></footer>
   </body>
 </html>

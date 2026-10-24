@@ -30,7 +30,7 @@ Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, ro
 
 ## Role setup and starting information
 
-The host edits role counts in **At this table**, then selects **Save role setup**. All players can see the saved distribution; nobody can see the assignments before starting. Presets cover 5–10 players plus the custom 15-player example. The server rejects changes by non-hosts, changes after starting, and reductions below the current roster size.
+The player grid is the main view for everyone, including the host. Role counts appear in the **Game setup** sidebar (below the roster on phones). The host opens **Edit roles**, adjusts counts, then selects **Save setup**. Role explanations are available under **Role guide** and private **Role details**. All players can see the saved distribution; nobody can see the assignments before starting. Presets cover 5–10 players plus the custom 15-player example. The server rejects changes by non-hosts, changes after starting, and reductions below the current roster size.
 
 Standard setup uses the original game’s team counts: 5 players = 3 Good / 2 Evil; 6 = 4/2; 7 = 4/3; 8 = 5/3; 9 = 6/3; 10 = 6/4. Our standard preset requires one Merlin and one Assassin, and at most one each of Percival, Morgana, Mordred, and Oberon. With five players and Percival, include Morgana or Mordred. Custom mode supports 5–15 players, repeated special roles, optional Merlin/Assassin, and any split with at least one player on each side. Custom distributions are house rules, not an official balanced format.
 

@@ -23,13 +23,12 @@ function fillEditor(config) {
     row.className = 'role-input-row';
     const label = document.createElement('label');
     label.htmlFor = `role-${role}`;
-    label.textContent = `${role} · ${info.team}`;
+    label.textContent = role;
+    row.dataset.team = info.team;
     const input = document.createElement('input');
     input.type = 'number'; input.min = '0'; input.max = '15'; input.step = '1'; input.required = true;
     input.id = `role-${role}`; input.value = config.counts[role];
-    const description = document.createElement('p');
-    description.className = 'footnote'; description.textContent = info.description;
-    row.append(label, input, description);
+    row.append(label, input);
     return row;
   }));
 }
@@ -40,16 +39,22 @@ function validateDraft() {
   const counts = totals(draft);
   const overcrowded = counts.total < state.players.length;
   const dirty = JSON.stringify(draft) !== savedConfig;
-  $('#setup-validation').textContent = error || (overcrowded ? 'Remove players before reducing the number of seats.' : `${counts.total} seats · ${counts.Good} Good / ${counts.Evil} Evil${dirty ? ' · Unsaved changes' : ' · Saved'}`);
+  $('#setup-validation').textContent = error || (overcrowded ? 'Remove players to reduce seats.' : `${counts.total} seats · ${counts.Good} Good / ${counts.Evil} Evil${dirty ? ' · Unsaved' : ' · Saved'}`);
   $('#save-setup').disabled = busy || !online || !dirty || Boolean(error) || overcrowded;
   if (dirty) start.disabled = true;
 }
 function renderSetup(started) {
   const counts = totals(state.config);
-  $('#setup-summary').textContent = `${state.config.mode === 'custom' ? 'Custom rules' : 'Standard setup'} · ${counts.total} players · ${counts.Good} Good / ${counts.Evil} Evil`;
-  $('#setup-roles').textContent = Object.entries(state.config.counts).filter(([, n]) => n).map(([role, n]) => `${n} ${role}`).join(' · ');
+  $('#setup-summary').textContent = `${state.config.mode === 'custom' ? 'Custom' : 'Standard'} · ${counts.Good} Good / ${counts.Evil} Evil`;
+  $('#setup-roles').replaceChildren(...Object.entries(state.config.counts).filter(([, n]) => n).map(([role, n]) => {
+    const chip = document.createElement('span'); chip.className = 'role-chip'; chip.dataset.team = ROLE_INFO[role].team;
+    const amount = document.createElement('b'); amount.textContent = `×${n}`;
+    chip.append(role, amount);
+    return chip;
+  }));
   const host = state.me?.id === state.hostId;
   $('#setup-form').hidden = !host || started;
+  $('#setup-editor').hidden = !host || started;
   const key = JSON.stringify([state.hostId, state.config]);
   if (key !== editorKey) {
     fillEditor(state.config);
@@ -65,29 +70,41 @@ function render() {
   if (!state) return;
   const joined = Boolean(state.me);
   const started = state.phase === 'started';
-  $('#lobby-count').textContent = `${state.connectedCount} / ${state.capacity} CONNECTED`;
+  $('#lobby-count').textContent = `${state.connectedCount} / ${state.capacity} online`;
   form.hidden = joined || started;
   $('#join').disabled = busy || !online || state.connectedCount >= state.capacity;
   start.hidden = !joined || started;
   start.disabled = busy || !online || state.connectedCount !== state.capacity;
   leave.hidden = !joined || started;
   leave.disabled = busy || !online;
-  $('#players').replaceChildren(...state.players.map(player => {
+  const seats = Array.from({ length: state.capacity }, (_, index) => {
+    const player = state.players[index];
     const row = document.createElement('li');
-    const name = document.createElement('span');
-    name.textContent = player.name + (player.id === state.me?.id ? ' (you)' : '') + (player.id === state.hostId ? ' · Host' : '');
+    const number = document.createElement('span'); number.className = 'seat-number'; number.textContent = String(index + 1).padStart(2, '0');
+    const avatar = document.createElement('div'); avatar.className = 'avatar'; avatar.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span'); name.className = 'player-name';
+    row.append(number, avatar, name);
+    if (!player) {
+      row.className = 'empty-seat'; avatar.textContent = '+'; name.textContent = 'Open seat';
+      return row;
+    }
+    row.classList.toggle('is-me', player.id === state.me?.id);
+    avatar.textContent = player.name.split(/\s+/).map(part => Array.from(part)[0]).slice(0, 2).join('').toUpperCase();
+    name.textContent = player.name + (player.id === state.me?.id ? ' (you)' : '');
+    const meta = document.createElement('div'); meta.className = 'player-meta';
     const status = document.createElement('span');
     status.className = player.connected ? 'player-online' : 'player-offline';
-    status.textContent = player.connected ? 'Connected' : 'Disconnected';
-    row.append(name, status);
+    status.textContent = player.connected ? 'Online' : 'Offline';
+    meta.append(status);
+    if (player.id === state.hostId) {
+      const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
+    }
+    row.append(meta);
     if (!started && state.me?.id === state.hostId && player.id !== state.me.id) {
-      const controls = document.createElement('div');
-      controls.className = 'player-controls';
+      const controls = document.createElement('div'); controls.className = 'player-controls';
       for (const [label, endpoint] of [['Make host', '/api/host'], ['Kick', '/api/kick']]) {
         const control = document.createElement('button');
-        control.type = 'button';
-        control.className = 'secondary';
-        control.textContent = label;
+        control.type = 'button'; control.className = endpoint === '/api/kick' ? 'secondary kick' : 'secondary'; control.textContent = label;
         control.setAttribute('aria-label', `${label}: ${player.name}`);
         control.disabled = busy || !online || (endpoint === '/api/host' && !player.connected);
         control.addEventListener('click', () => update(endpoint, { playerId: player.id }));
@@ -96,10 +113,12 @@ function render() {
       row.append(controls);
     }
     return row;
-  }));
+  });
+  $('#players').replaceChildren(...seats);
   $('#role-panel').hidden = !state.me?.role;
+  $('#role-panel').dataset.team = state.me?.team || '';
   $('#role').textContent = state.me?.role || '';
-  $('#team').textContent = state.me?.team ? `You are on the ${state.me.team} team.` : '';
+  $('#team').textContent = state.me?.team ? `${state.me.team} team` : '';
   $('#role-description').textContent = ROLE_INFO[state.me?.role]?.description || '';
   const information = state.me?.information;
   $('#information-heading').textContent = information?.heading || '';
@@ -114,10 +133,10 @@ function render() {
     $('#information-players').append(row);
   }
   $('#hint').textContent = started
-    ? joined ? 'Roles assigned. The roster is locked.' : 'This game has started. The roster is locked.'
-    : joined ? state.connectedCount === state.capacity ? 'Everyone is here. Any player can start.' : `Waiting for ${state.capacity - state.connectedCount} more connected player${state.connectedCount === state.capacity - 1 ? '' : 's'}.`
-    : state.kicked ? 'The host removed you from the lobby. You can join again if there is a seat.'
-    : state.connectedCount === state.capacity ? 'The lobby is full.' : 'Enter your name to take a seat.';
+    ? joined ? 'Game started' : 'Game in progress'
+    : joined ? state.connectedCount === state.capacity ? 'Ready to start' : `Waiting for ${state.capacity - state.connectedCount} player${state.connectedCount === state.capacity - 1 ? '' : 's'}`
+    : state.kicked ? 'Removed by host. Join again if a seat is open.'
+    : state.connectedCount === state.capacity ? 'Table full' : 'Join to take a seat';
   renderSetup(started);
 }
 
@@ -149,7 +168,7 @@ async function update(path = '/api/heartbeat', body) {
     online = false;
     connection.textContent = 'Reconnecting…';
     connection.dataset.state = 'offline';
-    if (action) feedback.textContent = `${error.message} Checking the latest game state…`;
+    if (action) feedback.textContent = error.message;
   } finally {
     busy = false;
     render();
@@ -174,5 +193,10 @@ form.addEventListener('submit', event => {
 });
 start.addEventListener('click', () => update('/api/start'));
 leave.addEventListener('click', () => update('/api/leave'));
+$('#role-guide').replaceChildren(...Object.entries(ROLE_INFO).flatMap(([role, info]) => {
+  const term = document.createElement('dt'); term.textContent = `${role} · ${info.team}`;
+  const description = document.createElement('dd'); description.textContent = info.description;
+  return [term, description];
+}));
 // No unload/leave request: closing one tab must not disconnect other tabs.
 update('/api/state');
