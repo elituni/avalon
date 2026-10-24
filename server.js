@@ -162,11 +162,10 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
         }
         if (path === '/api/config') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can change the role setup.' });
-          if (demo) return send(409, { error: 'This demo uses four players with laze as Percival.' });
           if (phase !== 'lobby') return send(409, { error: 'Role setup is locked after the game starts.' });
           let proposed;
           try { proposed = JSON.parse(body); } catch { return send(400, { error: 'Invalid role setup.' }); }
-          const error = validateConfig(proposed);
+          const error = validateConfig(proposed, { demo });
           if (error) return send(400, { error });
           if (totals(proposed).total < players.size) return send(409, { error: 'There are more players in the lobby than seats in this setup. Remove players first.' });
           config = { mode: proposed.mode, counts: { ...proposed.counts } };

@@ -29,7 +29,7 @@ export function totals(config) {
   }
   return result;
 }
-export function validateConfig(config) {
+export function validateConfig(config, { demo = false } = {}) {
   if (!config || !['standard', 'custom'].includes(config.mode) || !config.counts || typeof config.counts !== 'object' || Array.isArray(config.counts)) return 'Choose a setup mode and role counts.';
   if (Object.keys(config.counts).length !== Object.keys(ROLE_INFO).length || Object.keys(config.counts).some(role => !Object.hasOwn(ROLE_INFO, role))) return 'Use only the eight supported roles.';
   for (const role of Object.keys(ROLE_INFO)) {
@@ -37,7 +37,9 @@ export function validateConfig(config) {
   }
   const { total, Resistance, Spy } = totals(config);
   const max = config.mode === 'standard' ? 10 : 15;
-  if (total < 5 || total > max) return `Choose between 5 and ${max} players in ${config.mode} mode.`;
+  if (demo && (config.mode !== 'custom' || total !== 4)) return 'The demo has four seats. Use custom mode with four roles.';
+  if (demo && config.counts.Percival < 1) return 'Keep a Percival role for laze in this demo.';
+  if (total < (demo ? 4 : 5) || total > max) return `Choose between 5 and ${max} players in ${config.mode} mode.`;
   if (!Resistance || !Spy) return 'Include at least one Resistance player and one Spy player.';
   if (config.mode === 'standard') {
     if (Spy !== SPY_COUNTS[total]) return `A standard ${total}-player game needs ${total - SPY_COUNTS[total]} Resistance and ${SPY_COUNTS[total]} Spy players.`;

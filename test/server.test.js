@@ -309,7 +309,17 @@ test('opt-in Percival demo has three persistent NPCs and reserves Percival for l
   const joined = (await player.call('/api/join', { name: 'laze' })).data;
   assert.equal(joined.hostId, joined.me.id);
   assert.equal(joined.connectedCount, 4);
-  assert.equal((await player.call('/api/config', joined.config)).status, 409);
+  assert.equal((await player.call('/api/config', joined.config)).status, 200);
+  const edited = structuredClone(joined.config);
+  edited.counts.Assassin = 0; edited.counts.Spy = 1;
+  assert.equal((await player.call('/api/config', edited)).status, 200);
+  assert.equal((await player.call()).data.config.counts.Spy, 1);
+  const noPercival = structuredClone(edited);
+  noPercival.counts.Percival = 0; noPercival.counts.Resistance = 1;
+  assert.equal((await player.call('/api/config', noPercival)).status, 400);
+  const tooMany = structuredClone(edited); tooMany.counts.Resistance = 1;
+  assert.equal((await player.call('/api/config', tooMany)).status, 400);
+  assert.equal((await client().call('/api/config', edited)).status, 403);
   assert.equal((await player.call('/api/kick', { playerId: initial.players[0].id })).status, 409);
   const started = (await player.call('/api/start')).data;
   assert.equal(started.me.role, 'Percival');

@@ -37,7 +37,7 @@ function fillEditor(config) {
 function validateDraft() {
   if (!state || $('#setup-form').hidden) return;
   const draft = readDraft();
-  const error = validateConfig(draft);
+  const error = validateConfig(draft, { demo: state.demo });
   const counts = totals(draft);
   const overcrowded = counts.total < state.players.length;
   const dirty = JSON.stringify(draft) !== savedConfig;
@@ -54,9 +54,11 @@ function renderSetup(started) {
     chip.append(role, amount);
     return chip;
   }));
-  const host = state.me?.id === state.hostId && !state.demo;
+  const host = state.me?.id === state.hostId;
   $('#setup-form').hidden = !host || started;
   $('#setup-editor').hidden = !host || started;
+  $('#preset').closest('.select-row').hidden = state.demo;
+  $('#mode').querySelector('[value="standard"]').disabled = state.demo;
   const key = JSON.stringify([state.hostId, state.config]);
   if (key !== editorKey) {
     fillEditor(state.config);
@@ -213,7 +215,7 @@ $('#preset').addEventListener('change', () => {
 });
 $('#setup-form').addEventListener('submit', event => {
   event.preventDefault();
-  if (!validateConfig(readDraft())) update('/api/config', readDraft());
+  if (!validateConfig(readDraft(), { demo: state.demo })) update('/api/config', readDraft());
 });
 form.addEventListener('submit', event => {
   event.preventDefault();
