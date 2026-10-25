@@ -110,11 +110,3 @@ select { width: 100%; padding: 7px; font-size: 12px; }
 
 #players > li.known-lover { background: #fff1f7; border-color: #e7b7cc; }
 .lover-badge { color: #923e65; background: #f9dce9; border-radius: 4px; padding: 2px 5px; font-size: .72rem; font-weight: 700; }
-
-.card-options { margin: 16px 0 0; padding: 10px 0; border: 0; border-top: 1px solid #dce1e2; }
-.card-options legend { font-weight: 700; }
-#card-inputs { display: grid; gap: 10px; }
-#card-inputs label { display: flex; align-items: center; gap: 8px; }
-#card-inputs input { width: 16px; height: 16px; margin: 0; }
-.card-badge { color: #63501c; background: #f5ebc8; border-radius: 4px; padding: 2px 5px; font-size: .72rem; font-weight: 700; }
-#game-cards { margin: 12px 20px; font-size: .85rem; }

@@ -23,7 +23,6 @@
           <button id="join" type="submit" disabled>Join table</button>
         </form>
         <ul id="players" aria-label="Players"></ul>
-        <p id="game-cards" class="muted" hidden></p>
         <div class="table-actions">
           <p id="hint" class="muted">Connecting…</p>
           <div class="action-buttons">
@@ -63,13 +62,11 @@
               </div>
               <div class="select-row"><label for="mode">Mode</label><select id="mode"><option value="standard">Standard</option><option value="custom">Custom</option></select></div>
               <div id="role-inputs"></div>
-              <fieldset class="card-options"><legend>Cards</legend><div id="card-inputs"></div></fieldset>
               <p id="setup-validation" class="muted" role="status"></p>
               <button id="save-setup" type="submit">Save setup</button>
             </form>
           </details>
           <details class="rules-help"><summary>Role guide</summary><dl id="role-guide"></dl></details>
-          <details class="rules-help"><summary>Card guide</summary><dl id="card-guide"></dl><p class="muted">Setup only for now; card actions arrive with quests.</p></details>
         </div>
       </aside>
       <noscript>Enable JavaScript to join the game.</noscript>

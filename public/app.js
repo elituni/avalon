@@ -1,4 +1,4 @@
-import { ROLE_INFO, CARD_INFO, preset, totals, validateConfig } from '/roles.js';
+import { ROLE_INFO, preset, totals, validateConfig } from '/roles.js';
 
 const $ = selector => document.querySelector(selector);
 const form = $('#join-form');
@@ -10,6 +10,8 @@ const feedback = $('#feedback');
 let state;
 let busy = false;
 let timer;
+let events;
+let receivedEvents = 0;
 let online = false;
 let editorKey;
 let savedConfig;
@@ -33,17 +35,10 @@ function renderPlayerMenu() {
 
 
 function readDraft() {
-  return { cards: Object.fromEntries(Object.keys(CARD_INFO).map(card => [card, document.getElementById(`card-${card}`).checked])), mode: $('#mode').value, counts: Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, Number(document.getElementById(`role-${role}`).value)])) };
+  return { mode: $('#mode').value, counts: Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, Number(document.getElementById(`role-${role}`).value)])) };
 }
 function fillEditor(config) {
   $('#mode').value = config.mode;
-  $('#card-inputs').replaceChildren(...Object.entries(CARD_INFO).map(([card, info]) => {
-    const label = document.createElement('label');
-    const input = document.createElement('input');
-    input.type = 'checkbox'; input.id = `card-${card}`; input.checked = Boolean(config.cards?.[card]);
-    label.append(input, info.name);
-    return label;
-  }));
   $('#role-inputs').replaceChildren(...Object.entries(ROLE_INFO).map(([role, info]) => {
     const row = document.createElement('div');
     row.className = 'role-input-row';
@@ -78,11 +73,6 @@ function renderSetup(started) {
     chip.append(role, amount);
     return chip;
   }));
-  for (const [card, info] of Object.entries(CARD_INFO)) {
-    if (!state.config.cards?.[card]) continue;
-    const chip = document.createElement('span'); chip.className = 'role-chip'; chip.textContent = info.name;
-    $('#setup-roles').append(chip);
-  }
   const host = state.me?.id === state.hostId;
   $('#setup-form').hidden = !host || started;
   $('#setup-editor').hidden = !host || started;
@@ -146,13 +136,6 @@ function render() {
     if (player.id === state.hostId) {
       const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
     }
-    if (player.id === state.leaderId) {
-      const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Leader'; meta.append(badge);
-    }
-    for (const card of state.cards || []) {
-      if (card.holderId !== player.id) continue;
-      const badge = document.createElement('span'); badge.className = 'card-badge'; badge.textContent = CARD_INFO[card.id].name; meta.append(badge);
-    }
     if (knownSpy.has(player.id)) {
       const badge = document.createElement('span'); badge.className = 'spy-badge'; badge.textContent = 'Spy'; meta.append(badge);
     }
@@ -181,9 +164,6 @@ function render() {
     return row;
   });
   $('#players').replaceChildren(...seats);
-  const excalibur = started && state.config.cards?.excalibur;
-  $('#game-cards').hidden = !excalibur;
-  $('#game-cards').textContent = excalibur ? 'Excalibur · assigned with the quest team' : '';
   $('#role-panel').hidden = !state.me?.role;
   $('#role-panel').dataset.team = informationVisible ? state.me?.team || '' : '';
   $('#role').textContent = informationVisible ? state.me?.role || '??' : '??';
@@ -233,7 +213,10 @@ async function update(path = '/api/heartbeat', body) {
   render();
   const action = !['/api/heartbeat', '/api/state'].includes(path);
   try {
-    state = await request(path, body);
+    const before = receivedEvents;
+    const latest = await request(path, body);
+    if (before === receivedEvents) state = latest;
+    if (!events) connectEvents();
     online = true;
     connection.textContent = 'Live';
     connection.dataset.state = 'live';
@@ -249,6 +232,29 @@ async function update(path = '/api/heartbeat', body) {
     timer = setTimeout(() => update(), 3000);
   }
 }
+// Heartbeats retain presence detection and provide a polling fallback if SSE fails.
+function connectEvents() {
+  if (!('EventSource' in window)) return;
+  events = new EventSource('/api/events');
+  events.onmessage = event => {
+    state = JSON.parse(event.data);
+    receivedEvents += 1;
+    online = true;
+    connection.textContent = 'Live';
+    connection.dataset.state = 'live';
+    render();
+  };
+  events.onerror = () => {
+    connection.textContent = online ? 'Reconnecting live updates…' : 'Reconnecting…';
+    // EventSource reconnects automatically and receives a fresh private snapshot.
+  };
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  events?.close();
+  events = null;
+  update();
+});
 $('#close-player-menu').addEventListener('click', () => playerMenu.close());
 playerMenu.addEventListener('click', event => { if (event.target === playerMenu) playerMenu.close(); });
 playerMenu.addEventListener('close', () => {
@@ -290,11 +296,6 @@ reset.addEventListener('click', () => update('/api/reset'));
 leave.addEventListener('click', () => update('/api/leave'));
 $('#role-guide').replaceChildren(...Object.entries(ROLE_INFO).flatMap(([role, info]) => {
   const term = document.createElement('dt'); term.textContent = `${role} · ${info.team}`;
-  const description = document.createElement('dd'); description.textContent = info.description;
-  return [term, description];
-}));
-$('#card-guide').replaceChildren(...Object.values(CARD_INFO).flatMap(info => {
-  const term = document.createElement('dt'); term.textContent = info.name;
   const description = document.createElement('dd'); description.textContent = info.description;
   return [term, description];
 }));

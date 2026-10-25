@@ -11,23 +11,17 @@ export const ROLE_INFO = {
   Mordred: { team: 'Spy', description: 'Knows spies except Oberon. Hidden from Merlin.' },
   Oberon: { team: 'Spy', description: 'Unknown to other spies; knows none. Visible to Merlin.' },
 };
-export const CARD_INFO = {
-  ladyOfTheLake: { name: 'Lady of the Lake', description: 'After quests 2–4, learn a player’s team and pass them the card. No previous holders.' },
-  refOfTheRain: { name: 'Ref of the Rain', description: 'After a failed quest, learn a player’s team and pass them the card. No previous holders.' },
-  excalibur: { name: 'Excalibur', description: 'A quest team member may flip another member’s quest card.' },
-};
-export const emptyCards = () => Object.fromEntries(Object.keys(CARD_INFO).map(card => [card, false]));
 export const SPY_COUNTS = { 5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4 };
 export const emptyCounts = () => Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, 0]));
 export function preset(size = 6) {
   const counts = emptyCounts();
   if (size === 15) {
     Object.assign(counts, { Resistance: 5, Merlin: 2, Percival: 3, Assassin: 2, Morgana: 3 });
-    return { mode: 'custom', counts, cards: emptyCards() };
+    return { mode: 'custom', counts };
   }
   const spies = SPY_COUNTS[size];
   Object.assign(counts, { Resistance: size - spies - 2, Merlin: 1, Percival: 1, Assassin: 1, Morgana: 1, Spy: spies - 2 });
-  return { mode: 'standard', counts, cards: emptyCards() };
+  return { mode: 'standard', counts };
 }
 export function totals(config) {
   const result = { total: 0, Resistance: 0, Spy: 0 };
@@ -43,8 +37,6 @@ export function validateConfig(config) {
   for (const role of Object.keys(ROLE_INFO)) {
     if (!Number.isInteger(config.counts[role]) || config.counts[role] < 0 || config.counts[role] > 15) return 'Role counts must be whole numbers from 0 to 15.';
   }
-  if (config.cards !== undefined && (!config.cards || typeof config.cards !== 'object' || Array.isArray(config.cards) ||
-      Object.entries(config.cards).some(([key, value]) => !Object.hasOwn(CARD_INFO, key) || typeof value !== 'boolean'))) return 'Choose valid card options.';
   const { total } = totals(config);
   if (total < 1 || total > 15) return 'Choose between 1 and 15 total roles.';
   return null;

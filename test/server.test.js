@@ -477,37 +477,89 @@ test('lovers see only the opposite lover role, including repeated and unpaired s
   }
 });
 
-test('card setup is host-only, validated, public, locked on start and cleared on reset', async t => {
-  const { preset } = await import('../public/roles.js');
-  const { six, client } = await setup(t);
-  const players = await six();
-  const config = preset();
-  config.cards = { ladyOfTheLake: true, refOfTheRain: true, excalibur: true };
-  assert.equal((await players[1].call('/api/config', config)).status, 403);
-  for (const invalid of [null, [], 'ladyOfTheLake', { fake: true }, { excalibur: 1 }]) {
-    assert.equal((await players[0].call('/api/config', { ...config, cards: invalid })).status, 400);
+async function streamState(t, url, cookie = '') {
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const response = await fetch(url + '/api/events', { headers: { cookie }, signal: controller.signal });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /text\/event-stream/);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  return {
+    close: () => controller.abort(),
+    async next() {
+      while (true) {
+        const boundary = buffer.indexOf('\n\n');
+        if (boundary >= 0) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          if (frame.startsWith('data: ')) return JSON.parse(frame.slice(6));
+          continue;
+        }
+        const { value, done } = await reader.read();
+        assert.equal(done, false, 'stream should remain open');
+        buffer += decoder.decode(value, { stream: true });
+      }
+    },
+  };
+}
+
+test('SSE pushes joins, private roles, resets and fresh reconnect snapshots', { timeout: 5000 }, async t => {
+  const { client, url } = await setup(t);
+  const observer = await streamState(t, url);
+  assert.equal((await observer.next()).players.length, 0);
+  const host = client();
+  await host.call('/api/join', { name: 'Host' });
+  assert.equal((await observer.next()).players.length, 1);
+  const hostStream = await streamState(t, url, host.cookie);
+  assert.equal((await hostStream.next()).me.name, 'Host');
+  for (let i = 1; i < 6; i++) {
+    await client().call('/api/join', { name: `Guest ${i}` });
+    assert.equal((await observer.next()).players.length, i + 1);
+    assert.equal((await hostStream.next()).players.length, i + 1);
   }
-  const saved = await players[0].call('/api/config', config);
-  assert.equal(saved.status, 200);
-  assert.deepEqual(saved.data.cards, []);
-  assert.equal(saved.data.leaderId, null);
-  assert.deepEqual((await client().call()).data.config.cards, config.cards);
-  const started = (await players[0].call('/api/start')).data;
-  const leaderIndex = started.players.findIndex(p => p.id === started.leaderId);
-  assert.ok(leaderIndex >= 0);
-  const holderId = started.players[(leaderIndex + 1) % 6].id;
-  assert.deepEqual(started.cards, [
-    { id: 'ladyOfTheLake', holderId },
-    { id: 'refOfTheRain', holderId },
-    { id: 'excalibur', holderId: null },
-  ]);
-  assert.deepEqual((await client().call()).data.cards, started.cards);
-  assert.deepEqual((await players[0].call()).data.cards, started.cards);
-  assert.equal((await players[0].call('/api/config', preset())).status, 409);
-  const reset = (await players[0].call('/api/reset')).data;
-  assert.equal(reset.leaderId, null);
-  assert.deepEqual(reset.cards, []);
-  assert.deepEqual(reset.config, config);
-  await players[0].call('/api/config', preset());
-  assert.deepEqual((await players[0].call('/api/start')).data.cards, []);
+  const started = (await host.call('/api/start')).data;
+  const privateState = await hostStream.next();
+  assert.deepEqual(privateState.me, started.me);
+  const publicState = await observer.next();
+  assert.equal(publicState.phase, 'started');
+  assert.equal(publicState.me, null);
+  for (const player of publicState.players) assert.equal('role' in player, false);
+  hostStream.close();
+  const reconnect = await streamState(t, url, host.cookie);
+  assert.deepEqual((await reconnect.next()).me, started.me);
+  await host.call('/api/reset');
+  assert.equal((await reconnect.next()).me.role, null);
+  assert.equal((await observer.next()).phase, 'lobby');
+});
+
+test('SSE detects heartbeat expiry and broadcasts kick and host changes', { timeout: 5000 }, async t => {
+  const { client, url, advance } = await setup(t);
+  const host = client();
+  const guest = client();
+  await host.call('/api/join', { name: 'Host' });
+  const joined = (await guest.call('/api/join', { name: 'Guest' })).data;
+  const stream = await streamState(t, url, guest.cookie);
+  await stream.next();
+  await host.call('/api/kick', { playerId: joined.me.id });
+  const kicked = await stream.next();
+  assert.equal(kicked.kicked, true);
+  assert.equal(kicked.me, null);
+  await guest.call('/api/join', { name: 'Guest' });
+  await stream.next();
+  advance(10000);
+  await guest.call('/api/heartbeat');
+  advance(6000);
+  const expired = await stream.next();
+  assert.equal(expired.connectedCount, 1);
+  assert.equal(expired.hostId, expired.me.id);
+});
+
+test('SSE rejects cross-site connections and incorrect methods', async t => {
+  const { url } = await setup(t);
+  for (const headers of [{ origin: 'https://other.example' }, { 'sec-fetch-site': 'cross-site' }]) {
+    assert.equal((await fetch(url + '/api/events', { headers })).status, 403);
+  }
+  assert.equal((await fetch(url + '/api/events', { method: 'POST' })).status, 405);
 });

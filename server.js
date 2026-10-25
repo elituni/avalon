@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { ROLE_INFO, emptyCards, preset, totals, validateConfig } from './public/roles.js';
+import { ROLE_INFO, preset, totals, validateConfig } from './public/roles.js';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
@@ -58,8 +58,6 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
   }
   let phase = 'lobby';
   let gameNumber = 0;
-  let leaderId = null;
-  let cards = [];
   let config = preset(demo ? 5 : 6);
   if (demo) {
     // Four-seat UI demo only; normal setups still require at least five players.
@@ -81,8 +79,6 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
     return {
       phase,
       gameNumber,
-      leaderId,
-      cards,
       demo,
       config,
       capacity: totals(config).total,
@@ -93,25 +89,45 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
       me: me ? { id: me.id, name: me.name, role: me.role ?? null, team: me.role ? ROLE_INFO[me.role].team : null, information: startingInformation(me, [...players.values()]) } : null,
     };
   };
-  return createServer(async (req, res) => {
+  const streams = new Set();
+  const push = stream => {
+    const data = JSON.stringify(snapshot(stream.token));
+    if (data === stream.last) return;
+    stream.last = data;
+    // Disconnect slow clients instead of buffering private snapshots indefinitely.
+    if (!stream.res.write(`data: ${data}\n\n`)) stream.res.destroy();
+  };
+  const broadcast = () => { for (const stream of streams) push(stream); };
+  let ticks = 0;
+  const ticker = setInterval(() => {
+    broadcast(); // Detect heartbeat expiry even when nobody sends a request.
+    if (++ticks % 10 === 0) {
+      for (const stream of streams) {
+        if (!stream.res.write(': keepalive\n\n')) stream.res.destroy();
+      }
+    }
+  }, 1000);
+  ticker.unref();
+  const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'self'; frame-ancestors 'none'; base-uri 'none'");
     const send = (status, data) => {
       res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
+      broadcast();
     };
     try {
       const path = req.url.split('?')[0];
       if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true });
       if (path.startsWith('/api/')) {
-        const methods = { '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/reset': 'POST', '/api/leave': 'POST', '/api/host': 'POST', '/api/kick': 'POST', '/api/config': 'POST' };
+        const methods = { '/api/events': 'GET', '/api/state': 'GET', '/api/join': 'POST', '/api/heartbeat': 'POST', '/api/start': 'POST', '/api/reset': 'POST', '/api/leave': 'POST', '/api/host': 'POST', '/api/kick': 'POST', '/api/config': 'POST' };
         if (!methods[path]) return send(404, { error: 'Not found' });
         if (req.method !== methods[path]) {
           res.setHeader('Allow', methods[path]);
           return send(405, { error: 'Method not allowed' });
         }
-        if (req.method === 'POST' && (req.headers['sec-fetch-site'] === 'cross-site' ||
+        if ((req.method === 'POST' || path === '/api/events') && (req.headers['sec-fetch-site'] === 'cross-site' ||
             (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host))) {
           return send(403, { error: 'Use the game page to perform this action.' });
         }
@@ -119,6 +135,19 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
         if (!token) {
           token = randomBytes(32).toString('hex');
           res.setHeader('Set-Cookie', `avalon_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800`);
+        }
+        if (path === '/api/events') {
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+          });
+          res.write('retry: 1000\n\n');
+          const stream = { token, res, last: null };
+          streams.add(stream);
+          res.on('close', () => streams.delete(stream));
+          push(stream);
+          return;
         }
         let body = '';
         for await (const chunk of req) {
@@ -186,7 +215,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
               if (player.npc) players.delete(key);
             }
           }
-          config = { mode: proposed.mode, counts: { ...proposed.counts }, cards: { ...emptyCards(), ...proposed.cards } };
+          config = { mode: proposed.mode, counts: { ...proposed.counts } };
         }
         if (path === '/api/start') {
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can start the game.' });
@@ -203,14 +232,6 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
             const percival = [...players.values()].find(p => p.role === 'Percival');
             if (laze && percival) [laze.role, percival.role] = [percival.role, laze.role];
           }
-          const seats = [...players.values()];
-          const leaderIndex = randomInt(seats.length);
-          leaderId = seats[leaderIndex].id;
-          // ProAvalon starts both information cards one seat after the leader.
-          // Excalibur is assigned with a quest team, not during role dealing.
-          cards = Object.entries(config.cards).filter(([, enabled]) => enabled).map(([id]) => ({
-            id, holderId: id === 'excalibur' ? null : seats[(leaderIndex + 1) % seats.length].id,
-          }));
           phase = 'started';
           gameNumber += 1;
         }
@@ -219,8 +240,6 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           if (phase !== 'started') return send(409, { error: 'The game is already in the lobby.' });
           for (const player of players.values()) delete player.role;
           phase = 'lobby';
-          leaderId = null;
-          cards = [];
         }
         return send(200, snapshot(token));
       }
@@ -237,6 +256,14 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
       else res.end();
     }
   });
+  const close = server.close.bind(server);
+  server.close = (...args) => {
+    clearInterval(ticker);
+    for (const stream of streams) stream.res.end();
+    streams.clear();
+    return close(...args);
+  };
+  return server;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
