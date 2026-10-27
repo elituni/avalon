@@ -121,3 +121,60 @@ test('15-player rosters with markdown-heavy names fit Discord embed limits', () 
   assert.ok(data.fields.every(field => field.value.length <= 1024));
   assert.equal(data.fields.length, 4);
 });
+
+test('setup button opens a private draft; dropdowns save together and remain host-only', async () => {
+  const { games, handler } = fixture();
+  await handler(interaction('create'));
+  const game = games.requireGame('guild');
+  const denied = interaction('setup', { userId: 'guest', gameId: game.id });
+  await handler(denied);
+  assert.match(denied.response.content, /Only the host/);
+  const open = interaction('setup', { gameId: game.id });
+  await handler(open);
+  assert.match(open.response.content, /Game setup/);
+  assert.equal(open.response.components.length, 3);
+  function select(action, value) {
+    const i = interaction(action, { gameId: game.id });
+    i.isButton = () => false;
+    i.isStringSelectMenu = () => true;
+    i.values = [value];
+    i.deferUpdate = async () => { i.deferred = true; };
+    return i;
+  }
+  await handler(select('preset', '5'));
+  assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
+  const role = select('editrole', 'Merlin');
+  await handler(role);
+  assert.equal(role.response.components.length, 4);
+  await handler(select('count:Merlin', '0'));
+  await handler(select('count:Resistance', '2'));
+  const save = interaction('savesetup', { gameId: game.id, messageId: 'private-editor' });
+  save.deferUpdate = async () => { save.deferred = true; };
+  await handler(save);
+  assert.match(save.response.content, /saved/);
+  assert.equal(games.requireGame('guild').config.counts.Merlin, 0);
+  assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
+  const stale = select('preset', '6');
+  await handler(stale);
+  assert.match(stale.response.content, /Reopen/);
+});
+
+test('leader announcement mentions only the leader and persists across subsequent updates', async () => {
+  const { games, handler } = fixture();
+  await handler(interaction('create'));
+  await handler(interaction('setup', { options: { resistance: 1 } }));
+  await handler(interaction('start'));
+  const game = games.requireGame('guild');
+  assert.equal(game.leaderId, 'host');
+  const sent = [];
+  const channel = { type: ChannelType.GuildText, messages: { edit: async () => {} }, send: async payload => { sent.push(payload); return { id: 'announcement' }; } };
+  const client = { channels: { fetch: async () => channel } };
+  await publishGame(client, games.store, game);
+  await publishGame(client, games.store, games.requireGame('guild'));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].content, /<@host> goes first/);
+  assert.deepEqual(sent[0].allowedMentions, { parse: [], users: ['host'] });
+  assert.equal(sent[0].enforceNonce, true);
+  assert.equal(games.requireGame('guild').leaderAnnouncementId, 'announcement');
+  assert.match(JSON.stringify(lobbyMessage(game)), /Leader/);
+});

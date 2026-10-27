@@ -20,6 +20,8 @@ A browser session cookie identifies a player across tabs and refreshes. To test 
 
 Browsers receive immediate, session-specific updates over server-sent events (SSE). Each connection and reconnection receives a fresh snapshot; private roles are sent only to their own session. Browsers still send heartbeats every three seconds for presence detection and as a polling fallback if streaming is unavailable. Returning to a visible tab reconnects the stream and refreshes presence. A player is disconnected after 15 seconds without one, including when a device sleeps or the browser suspends background tabs. Before starting, disconnected seats can be reclaimed by new players. Players can also explicitly leave the lobby. After starting, the roster is locked and reconnecting restores the original role.
 
+Starting chooses a random first leader and shows a **Leader** badge on that player. The leader stays the same through reconnects and clears on reset; this is separate from the host.
+
 State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, or assassination action yet. A session identifies a browser, not a verified person.
 
 ```sh

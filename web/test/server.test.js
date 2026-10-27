@@ -573,3 +573,14 @@ test('shared public rules retain their URL while private shared code stays inacc
     assert.equal((await fetch(url + path)).status, 404);
   }
 });
+
+test('first leader is public, stable on reconnect, and cleared on reset', async t => {
+  const { client, six } = await setup(t);
+  const players = await six();
+  assert.equal((await players[0].call()).data.leaderId, null);
+  const started = (await players[0].call('/api/start')).data;
+  assert.ok(started.players.some(p => p.id === started.leaderId));
+  assert.equal((await client().call()).data.leaderId, started.leaderId);
+  assert.equal((await players[0].call()).data.leaderId, started.leaderId);
+  assert.equal((await players[0].call('/api/reset')).data.leaderId, null);
+});

@@ -48,3 +48,8 @@ export function assignRoles(players, config) {
   }
   return players.map((player, index) => ({ ...player, role: roles[index] }));
 }
+
+export function chooseLeader(players) {
+  if (!players.length) throw new Error('A leader needs at least one player.');
+  return players[randomInt(players.length)].id;
+}

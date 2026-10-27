@@ -1,5 +1,5 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, escapeMarkdown } from 'discord.js';
-import { totals } from '../../shared/roles.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, escapeMarkdown } from 'discord.js';
+import { ROLE_INFO, totals } from '../../shared/roles.js';
 
 export function lobbyMessage(game) {
   const started = game.phase === 'started';
@@ -8,7 +8,7 @@ export function lobbyMessage(game) {
   const status = ended ? 'Game ended' : started
     ? pending.length ? `${pending.length} role DM(s) pending. Host: use /avalon retry after players enable DMs.` : 'Roles delivered. Check your DMs!'
     : 'Join below. The host starts when all seats are filled.';
-  const roster = game.players.map((p, i) => `${i + 1}. ${escapeMarkdown(p.name)}${p.id === game.hostId ? ' · Host' : ''}`);
+  const roster = game.players.map((p, i) => `${i + 1}. ${escapeMarkdown(p.name)}${p.id === game.hostId ? ' · Host' : ''}${started && p.id === game.leaderId ? ' · Leader' : ''}`);
   const playerFields = [];
   for (let offset = 0; offset < Math.max(roster.length, 1); offset += 5) {
     playerFields.push({
@@ -27,6 +27,7 @@ export function lobbyMessage(game) {
     new ButtonBuilder().setCustomId(`avalon:${game.id}:join`).setLabel('Join').setStyle(ButtonStyle.Primary)
       .setDisabled(started || ended || game.players.length >= totals(game.config).total),
     new ButtonBuilder().setCustomId(`avalon:${game.id}:leave`).setLabel('Leave').setStyle(ButtonStyle.Secondary).setDisabled(started || ended),
+    new ButtonBuilder().setCustomId(`avalon:${game.id}:setup`).setLabel('Edit setup').setStyle(ButtonStyle.Secondary).setDisabled(started || ended),
     new ButtonBuilder().setCustomId(`avalon:${game.id}:start`).setLabel('Start').setStyle(ButtonStyle.Success)
       .setDisabled(started || ended || game.players.length !== totals(game.config).total),
   );
@@ -42,4 +43,27 @@ export function actionSummary(action, game) {
       : 'All role DMs delivered. You can start playing.';
   }
   return { create: 'Lobby created. You are the host and have joined.', join: 'You are in the lobby.', leave: 'You left the lobby.', setup: 'Role setup saved.' }[action];
+}
+
+export function setupMessage(game, selectedRole = null) {
+  const counts = totals(game.config);
+  const rows = [
+    new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+      .setCustomId(`avalon:${game.id}:preset`).setPlaceholder('Choose a player-count preset')
+      .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) })))),
+    new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+      .setCustomId(`avalon:${game.id}:editrole`).setPlaceholder('Choose a role to adjust')
+      .addOptions(...Object.keys(ROLE_INFO).map(role => ({ label: `${role} ×${game.config.counts[role]}`, value: role, default: role === selectedRole })))),
+  ];
+  if (selectedRole) rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+    .setCustomId(`avalon:${game.id}:count:${selectedRole}`).setPlaceholder(`Number of ${selectedRole} roles`)
+    .addOptions(...Array.from({ length: 16 }, (_, n) => ({ label: String(n), value: String(n), default: n === game.config.counts[selectedRole] })))));
+  rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder()
+    .setCustomId(`avalon:${game.id}:savesetup`).setLabel('Save setup').setStyle(ButtonStyle.Success)));
+  return {
+    content: `**Game setup** · ${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy\n` +
+      Object.entries(game.config.counts).map(([role, n]) => `${role}: **${n}**`).join(' · ') +
+      '\nChoose a preset, or select a role and its count. Click **Save setup** to apply your changes. The saved setup must have 1–15 seats and enough seats for everyone joined.',
+    embeds: [], components: rows, allowedMentions: { parse: [] },
+  };
 }

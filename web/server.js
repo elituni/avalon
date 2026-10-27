@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { ROLE_INFO, preset, totals, validateConfig } from '../shared/roles.js';
-import { assignRoles, startingInformation } from '../shared/game.js';
+import { assignRoles, chooseLeader, startingInformation } from '../shared/game.js';
 export { startingInformation } from '../shared/game.js';
 
 const assets = new Map([
@@ -31,6 +31,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
     config.counts.Resistance = 0;
   }
   let hostId = null;
+  let leaderId = null;
   const kicked = new Set();
   const connected = player => player.npc || now() - player.lastSeen < graceMs;
   const updateHost = () => {
@@ -49,6 +50,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
       config,
       capacity: totals(config).total,
       hostId,
+      leaderId,
       kicked: kicked.has(token),
       connectedCount: [...players.values()].filter(connected).length,
       players: [...players.values()].map(p => ({ id: p.id, name: p.name, connected: connected(p), npc: Boolean(p.npc) })),
@@ -194,6 +196,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
             const percival = [...players.values()].find(p => p.role === 'Percival');
             if (laze && percival) [laze.role, percival.role] = [percival.role, laze.role];
           }
+          leaderId = chooseLeader([...players.values()]);
           phase = 'started';
           gameNumber += 1;
         }
@@ -201,6 +204,7 @@ export function createGameServer({ now = Date.now, graceMs = 15000, demo = false
           if (!me || me.id !== hostId) return send(403, { error: 'Only the host can reset the game.' });
           if (phase !== 'started') return send(409, { error: 'The game is already in the lobby.' });
           for (const player of players.values()) delete player.role;
+          leaderId = null;
           phase = 'lobby';
         }
         return send(200, snapshot(token));

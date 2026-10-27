@@ -155,3 +155,18 @@ test('corrupt or unsupported saved state fails closed', t => {
   assert.throws(() => new GameStore(f.file), /Unsupported/);
   assert.match(readFileSync(f.file, 'utf8'), /"version":2/);
 });
+
+test('leader survives DM retry and restart, and role messages end with a divider', async t => {
+  const f = fixture(t, { disk: true });
+  await f.full();
+  f.blocked.add('2');
+  const game = await f.act('start', '0');
+  assert.ok(game.players.some(p => p.id === game.leaderId));
+  const persisted = new GameStore(f.file).get('guild');
+  assert.equal(persisted.leaderId, game.leaderId);
+  f.blocked.clear();
+  assert.equal((await f.act('retry', '0')).leaderId, game.leaderId);
+  const message = roleMessage(game, game.players[0]);
+  assert.ok(message.endsWith('────────────────────'));
+  assert.ok(!message.includes('Keep this message private'));
+});

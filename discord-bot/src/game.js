@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { assignRoles, startingInformation } from '../../shared/game.js';
+import { assignRoles, chooseLeader, startingInformation } from '../../shared/game.js';
 import { ROLE_INFO, preset, totals, validateConfig } from '../../shared/roles.js';
 
 export class GameError extends Error {}
@@ -17,7 +17,7 @@ export function roleMessage(game, player) {
     '', `**${info.heading}**`, info.explanation,
     ...info.players.map(p => `• ${safeName(p.name)} (ID: ${p.id})`),
     ...(info.players.length ? [] : ['No players revealed.']),
-    '', 'Keep this message private. Older games may have different roles.',
+    '', '────────────────────',
   ].join('\n');
 }
 
@@ -87,6 +87,8 @@ export class BotGames {
     this.host(game, userId); this.lobby(game);
     check(game.players.length === totals(game.config).total, 'Fill every seat before starting.');
     game.players = assignRoles(game.players, game.config);
+    game.leaderId = chooseLeader(game.players);
+    game.leaderAnnouncementId = null;
     game.phase = 'started';
     game.delivered = [];
     this.store.set(game.guildId, game); // Assignments must survive a crash before the first DM.

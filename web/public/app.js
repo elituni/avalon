@@ -136,6 +136,9 @@ function render() {
     if (player.id === state.hostId) {
       const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Host'; meta.append(badge);
     }
+    if (player.id === state.leaderId) {
+      const badge = document.createElement('span'); badge.className = 'host-badge'; badge.textContent = 'Leader'; meta.append(badge);
+    }
     if (knownSpy.has(player.id)) {
       const badge = document.createElement('span'); badge.className = 'spy-badge'; badge.textContent = 'Spy'; meta.append(badge);
     }
