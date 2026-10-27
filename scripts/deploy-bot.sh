@@ -39,7 +39,7 @@ install -m 644 "$release/discord-bot/deploy/avalon-bot.service" /etc/systemd/sys
 ln -sfn "$release" /opt/avalon-bot/current.next
 mv -Tf /opt/avalon-bot/current.next /opt/avalon-bot/current
 systemctl daemon-reload
-systemctl reset-failed avalon-bot
+systemctl reset-failed avalon-bot 2>/dev/null || true
 systemctl enable avalon-bot
 # Type=notify waits for an authenticated Discord gateway connection.
 if systemctl restart avalon-bot && systemctl is-active --quiet avalon-bot; then
@@ -52,7 +52,7 @@ if [[ -n "$previous" && "$previous" != /opt/avalon-bot/current && -d "$previous"
   ln -sfn "$previous" /opt/avalon-bot/current
   install -m 644 "$previous/discord-bot/deploy/avalon-bot.service" /etc/systemd/system/avalon-bot.service
   systemctl daemon-reload
-  systemctl reset-failed avalon-bot
+  systemctl reset-failed avalon-bot 2>/dev/null || true
   systemctl restart avalon-bot
   echo 'Bot startup failed; restored previous release.' >&2
 else
