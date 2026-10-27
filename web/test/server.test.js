@@ -194,7 +194,7 @@ test('kick updates readiness and host controls cannot change a started roster', 
 });
 
 test('only the host can configure roles; invalid setups and shrinking an occupied lobby are rejected', async t => {
-  const { preset, emptyCounts, validateConfig } = await import('../public/roles.js');
+  const { preset, emptyCounts, validateConfig } = await import('../../shared/roles.js');
   const { client } = await setup(t);
   const host = client();
   await host.call('/api/join', { name: 'Host' });
@@ -229,7 +229,7 @@ test('only the host can configure roles; invalid setups and shrinking an occupie
 });
 
 test('all eight roles receive exactly their allowed starting knowledge, and no observer gets it', async t => {
-  const { emptyCounts } = await import('../public/roles.js');
+  const { emptyCounts } = await import('../../shared/roles.js');
   const { client } = await setup(t);
   const host = client();
   await host.call('/api/join', { name: 'Host' });
@@ -258,7 +258,7 @@ test('all eight roles receive exactly their allowed starting knowledge, and no o
 });
 
 test('standard Percival without Morgana sees Merlin; custom repeated roles work for 15 players', async t => {
-  const { preset } = await import('../public/roles.js');
+  const { preset } = await import('../../shared/roles.js');
   const { client } = await setup(t);
   const host = client();
   await host.call('/api/join', { name: 'Host' });
@@ -347,7 +347,7 @@ test('normal games do not seed NPCs or enable demo restrictions', async t => {
 
 
 test('host can use any role mix, including a single team and no special roles', async t => {
-  const { emptyCounts } = await import('../public/roles.js');
+  const { emptyCounts } = await import('../../shared/roles.js');
   const { client } = await setup(t, { demo: true });
   const host = client();
   await host.call('/api/join', { name: 'laze' });
@@ -367,7 +367,7 @@ test('host can use any role mix, including a single team and no special roles', 
 });
 
 test('smaller demo setups release NPC seats and allow starting without Percival', async t => {
-  const { emptyCounts } = await import('../public/roles.js');
+  const { emptyCounts } = await import('../../shared/roles.js');
   const { client } = await setup(t, { demo: true });
   const host = client();
   await host.call('/api/join', { name: 'laze' });
@@ -449,7 +449,7 @@ test('demo host can kick NPCs, transfer to humans, and all humans can leave the 
 });
 
 test('lovers see only the opposite lover role, including repeated and unpaired setups', async t => {
-  const { emptyCounts } = await import('../public/roles.js');
+  const { emptyCounts } = await import('../../shared/roles.js');
   const { startingInformation } = await import('../server.js');
   const { client } = await setup(t);
   const host = client();
@@ -562,4 +562,14 @@ test('SSE rejects cross-site connections and incorrect methods', async t => {
     assert.equal((await fetch(url + '/api/events', { headers })).status, 403);
   }
   assert.equal((await fetch(url + '/api/events', { method: 'POST' })).status, 405);
+});
+
+test('shared public rules retain their URL while private shared code stays inaccessible', async t => {
+  const { url } = await setup(t);
+  const rules = await fetch(url + '/roles.js');
+  assert.equal(rules.status, 200);
+  assert.match(await rules.text(), /export const ROLE_INFO/);
+  for (const path of ['/shared/game.js', '/shared/roles.js', '/discord-bot/src/game.js']) {
+    assert.equal((await fetch(url + path)).status, 404);
+  }
 });

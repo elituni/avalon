@@ -1,6 +1,6 @@
 # Avalon lobby and private role reveal
 
-A shared lobby and private role reveal using Node.js and plain browser JavaScript. No dependencies or build step.
+The website lives in `web/`, the Discord bot in `discord-bot/`, and shared role definitions, validation, assignment, and starting information in `shared/`. Games and player identities are separate. The website uses Node.js and plain browser JavaScript with no dependencies or build step. See [the bot setup guide](discord-bot/README.md) for Discord commands and installation. Commands below run from the repository root.
 
 ## Run locally
 
@@ -23,8 +23,10 @@ Browsers receive immediate, session-specific updates over server-sent events (SS
 State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, or assassination action yet. A session identifies a browser, not a verified person.
 
 ```sh
-npm test
+npm --prefix web test
 ```
+
+For all website and bot tests, first run `npm --prefix discord-bot ci`, then `npm test`.
 
 Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, fresh-server reset, host permissions, transfers, kicks, automatic host succession, configuration validation, all ten roles’ private starting information, and custom 15-player games.
 
@@ -50,7 +52,7 @@ Quest play, voting, and assassination (including the lovers win condition) are n
 
 The default listener is `0.0.0.0:3000`. Override with `HOST` and `PORT`. The current IP-based deployment uses HTTP; private role responses are access-controlled by session but transport is not encrypted. HTTPS should be added before relying on role secrecy over untrusted networks.
 
-The API provides `GET /api/state`, `GET /api/events` (SSE), `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/reset`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all ten role counts (see `public/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
+The API provides `GET /api/state`, `GET /api/events` (SSE), `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/reset`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all ten role counts (see `shared/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
 
 ## Deploy to the Droplet
 
@@ -62,7 +64,7 @@ bash scripts/deploy.sh
 
 The default target is the `avalon-droplet` SSH alias (root at `178.128.7.152`). An alternate target can be passed as the first argument. The script uses `~/.ssh/config`; override this with `AVALON_SSH_CONFIG` if needed.
 
-Deployment requires a clean working tree, runs the tests, and transfers only the committed app and deployment files via rsync. Each release records its Git revision in `/opt/avalon/current/REVISION`. First-time setup installs an official Node.js 24 binary under `/opt/node`, verifies its published SHA-256 checksum, and creates an unprivileged `avalon` service user. Node.js is not automatically upgraded on subsequent deployments.
+Website deployment requires a clean working tree, runs the website tests, and transfers only the committed app and deployment files via rsync. Each release records its Git revision in `/opt/avalon/current/REVISION`. First-time setup installs an official Node.js 24 binary under `/opt/node`, verifies its published SHA-256 checksum, and creates an unprivileged `avalon` service user. Node.js is not automatically upgraded on subsequent deployments.
 
 The systemd service starts on boot, restarts after crashes, and listens on port 3000. The script allows port 3000 and SSH port 22 if UFW is active; any DigitalOcean cloud firewall must also permit port 3000. Deployment checks the API locally on the Droplet and restores the previous release if that check fails. Previous release directories are retained under `/opt/avalon/releases`.
 

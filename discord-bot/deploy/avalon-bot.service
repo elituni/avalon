@@ -1,0 +1,33 @@
+[Unit]
+Description=Avalon Discord bot
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=notify
+NotifyAccess=all
+User=avalon-bot
+Group=avalon-bot
+WorkingDirectory=/opt/avalon-bot/current/discord-bot
+ExecStart=/opt/node/bin/node --max-old-space-size=96 src/index.js
+EnvironmentFile=/etc/avalon-bot.env
+Environment=NODE_ENV=production
+Environment=AVALON_BOT_STATE=/var/lib/avalon-bot/games.json
+StateDirectory=avalon-bot
+StateDirectoryMode=0700
+UMask=0077
+MemoryHigh=128M
+MemoryMax=192M
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

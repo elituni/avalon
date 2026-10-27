@@ -1,5 +1,5 @@
 [Unit]
-Description=Avalon shared counter
+Description=Avalon website
 After=network.target
 
 [Service]
@@ -7,7 +7,7 @@ Type=simple
 User=avalon
 Group=avalon
 WorkingDirectory=/opt/avalon/current
-ExecStart=/opt/node/bin/node server.js
+ExecStart=/opt/node/bin/node web/server.js
 Environment=HOST=0.0.0.0
 Environment=PORT=3000
 Environment=NODE_ENV=production

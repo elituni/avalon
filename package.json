@@ -1,11 +1,14 @@
 {
-  "name": "avalon-counter",
+  "name": "avalon",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "test": "node --test"
+    "start": "node web/server.js",
+    "test": "node --test web/test/*.test.js discord-bot/test/*.test.js",
+    "start:bot": "npm --prefix discord-bot start"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

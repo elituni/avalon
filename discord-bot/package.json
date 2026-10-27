@@ -1,0 +1,17 @@
+{
+  "name": "avalon-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "register": "node --env-file-if-exists=.env src/register.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "discord.js": "14.27.0"
+  }
+}
