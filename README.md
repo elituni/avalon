@@ -13,5 +13,3 @@ Before submitting a pull request, use Node.js 22.12 or newer and run:
 npm --prefix discord-bot ci
 npm test
 ```
-
-Describe the rule change and its expected behavior in your pull request. If it requires changes outside `shared/`, open an issue to discuss it first.
