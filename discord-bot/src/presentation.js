@@ -70,8 +70,7 @@ export function setupMessage(game, page = 0) {
     .map(([role, n]) => `${role}: **${n}**`).join(' · ') || 'No roles selected.';
   return {
     content: `**Game setup** · ${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy\n` +
-      summary + `\n**Roles · page ${page + 1}/${SETUP_PAGE_COUNT}**\n` +
-      'Pick a number directly beside each role below, or choose a preset. Click **Save setup** to apply all pages. Keep 1–15 seats and enough seats for everyone joined.',
+      summary + `\n**Roles · page ${page + 1}/${SETUP_PAGE_COUNT}**`,
     embeds: [], components: rows, allowedMentions: { parse: [] },
   };
 }
