@@ -9,14 +9,12 @@ One active game per Discord server, in a regular text channel. The creator joins
 | Command | Purpose |
 | --- | --- |
 | `/avalon create` | Create a lobby and join as host |
-| `/avalon setup preset:6` | Host: choose a preset (5–10 or 15 players) |
-| `/avalon setup merlin:1 percival:1 resistance:2 assassin:1 morgana:1` | Host: specify custom counts; omitted roles become zero |
 | `/avalon start` | Host: fill every seat, assign roles, DM each player's starting information |
 | `/avalon retry` | Host: retry only pending role DMs, keeping assignments |
 | `/avalon end` | Host: end the game or cancel the lobby |
 | `/avalon help` | Show instructions |
 
-Lobby buttons: **Join**, **Leave**, **Edit setup**, **Start**. The host can open **Edit setup** (or `/avalon setup` without arguments), choose presets or all eleven labeled role dropdowns in one scrollable message, with numeric options, and apply the draft with **Save setup**. Drafts do not change the lobby until saved and are discarded on bot restart. If the host leaves before starting, hosting passes to the next joined player. The last player leaving closes the lobby. After starting, the roster and setup are locked. Play quests, voting, and assassination in voice or in person. Starting chooses a random first leader, shows a Leader label in the roster, and posts a message mentioning that player in the lobby channel. The choice and announcement ID persist across restarts and DM retries. Games already started before this feature retain their existing state; new games choose a leader. No optional cards are assigned.
+Lobby buttons: **Join**, **Leave**, **Edit setup**, **Start**. The host can open **Edit setup**, choose presets or all eleven labeled role dropdowns in one scrollable message, with numeric options, and apply the draft with **Save setup**. Drafts do not change the lobby until saved and are discarded on bot restart. If the host leaves before starting, hosting passes to the next joined player. The last player leaving closes the lobby. After starting, the roster and setup are locked. Play quests, voting, and assassination in voice or in person. Starting chooses a random first leader, shows a Leader label in the roster, and posts a message mentioning that player in the lobby channel. The choice and announcement ID persist across restarts and DM retries. Games already started before this feature retain their existing state; new games choose a leader. No optional cards are assigned.
 
 Role DMs include the game ID, role, team, and allowed starting information. Names and Discord user IDs identify revealed players. A failed role DM leaves that player pending, and the host receives a private delivery report. The public lobby only shows the number of pending DMs. Enable DMs from server members and unblock the bot before retrying. Existing DMs remain in history; ending a game does not delete them.
 

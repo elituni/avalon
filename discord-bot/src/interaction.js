@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { ROLE_INFO, preset } from '../../shared/roles.js';
 import { ChannelType, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { GameError } from './game.js';
-import { help, readSetup } from './commands.js';
+import { help } from './commands.js';
 import { actionSummary, lobbyMessage, setupMessage, setupNotice } from './presentation.js';
 
 export async function publishGame(client, store, game) {
@@ -44,6 +44,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
       if (!interaction.guildId) throw new GameError('Use Avalon in a server text channel.');
       const [, gameId, buttonAction, roleArgument] = (button || select) ? interaction.customId.split(':') : [];
       const action = slash ? interaction.options.getSubcommand() : buttonAction;
+      if (slash && action === 'setup') throw new GameError('Use the lobby’s Edit setup button to configure roles.');
       if (action === 'help') return await interaction.editReply({ content: help, allowedMentions: { parse: [] } });
       if (!['create', 'join', 'leave', 'setup', 'start', 'retry', 'end', 'preset', 'setuppage', 'count', 'savesetup'].includes(action)) throw new GameError('Unknown Avalon action.');
       await games.run(interaction.guildId, async () => {
@@ -58,7 +59,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
           game = games.requireGame(interaction.guildId, gameId);
           if (interaction.channelId !== game.channelId) throw new GameError(`Use the lobby channel <#${game.channelId}>.`);
           if (button && !editorAction && interaction.message.id !== game.messageId) throw new GameError('Use the latest lobby message.');
-          const openSetup = action === 'setup' && (button || !['preset', ...Object.keys(ROLE_INFO).map(r => r.toLowerCase())].some(key => interaction.options.getInteger(key) !== null));
+          const openSetup = action === 'setup' && button;
           if (openSetup || editorAction) {
             games.host(game, user.id); games.lobby(game);
             if (openSetup) drafts.set(game.guildId, { gameId: game.id, userId: user.id, config: structuredClone(game.config) });
@@ -80,7 +81,6 @@ export function interactionHandler({ client, games, publish = game => publishGam
           }
           if (action === 'join') game = await games.join(game, user);
           if (action === 'leave') game = games.leave(game, user.id);
-          if (action === 'setup') game = games.setup(game, user.id, readSetup(interaction.options));
           if (action === 'start') game = await games.start(game, user.id);
           if (action === 'retry') game = await games.retry(game, user.id);
           if (action === 'end') game = games.end(game, user.id);

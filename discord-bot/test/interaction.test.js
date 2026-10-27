@@ -4,7 +4,7 @@ import { ChannelType, MessageFlags } from 'discord.js';
 import { BotGames } from '../src/game.js';
 import { GameStore } from '../src/store.js';
 import { interactionHandler, publishGame } from '../src/interaction.js';
-import { command, readSetup } from '../src/commands.js';
+import { command } from '../src/commands.js';
 import { lobbyMessage, setupMessage } from '../src/presentation.js';
 
 function interaction(action, { userId = 'host', gameId, messageId = 'message', channelId = 'channel', options = {} } = {}) {
@@ -33,18 +33,33 @@ function fixture() {
   return { games, published, handler };
 }
 
-test('command schema exposes the agreed commands and custom setup semantics', () => {
-  const json = command.toJSON();
-  assert.deepEqual(json.options.map(o => o.name), ['create', 'setup', 'start', 'retry', 'end', 'help']);
-  assert.equal(json.options.find(o => o.name === 'setup').options.length, 12);
-  const options = values => ({ getInteger: key => values[key] ?? null });
-  assert.equal(readSetup(options({ preset: 6 })).counts.Merlin, 1);
-  const config = readSetup(options({ resistance: 3, spy: 2 }));
-  assert.equal(config.counts.Merlin, 0);
-  assert.equal(config.counts.Spy, 2);
-  assert.throws(() => readSetup(options({ preset: 6, merlin: 1 })), /not both/);
-  assert.throws(() => readSetup(options({})), /Provide/);
+test('registered commands omit setup and stale setup commands cannot change a lobby', async () => {
+  assert.deepEqual(command.toJSON().options.map(o => o.name), ['create', 'start', 'retry', 'end', 'help']);
+  const { games, handler } = fixture();
+  await handler(interaction('create'));
+  const before = games.requireGame('guild').config;
+  const stale = interaction('setup', { options: { resistance: 1 } });
+  await handler(stale);
+  assert.match(stale.response.content, /Edit setup button/);
+  assert.deepEqual(games.requireGame('guild').config, before);
 });
+
+async function configureSinglePlayer(games, handler) {
+  const game = games.requireGame('guild');
+  await handler(interaction('setup', { gameId: game.id }));
+  for (const role of Object.keys(game.config.counts)) {
+    const request = interaction(`count:${role}`, { gameId: game.id });
+    request.isButton = () => false;
+    request.isStringSelectMenu = () => true;
+    request.values = [role === 'Resistance' ? '1' : '0'];
+    request.deferUpdate = async () => { request.deferred = true; };
+    await handler(request);
+  }
+  const save = interaction('savesetup', { gameId: game.id });
+  save.deferUpdate = async () => { save.deferred = true; };
+  await handler(save);
+  assert.match(save.response.components[0].data.content, /saved/);
+}
 
 test('commands defer privately, enforce permissions, reject stale buttons, and end cleanly', async () => {
   const { games, handler } = fixture();
@@ -84,7 +99,7 @@ test('bot checks channel permissions before creating a game or sending DMs', asy
 test('public lobby never includes assignments or starting information', async () => {
   const { games, handler, published } = fixture();
   await handler(interaction('create'));
-  await handler(interaction('setup', { options: { resistance: 1 } }));
+  await configureSinglePlayer(games, handler);
   const start = interaction('start');
   await handler(start);
   assert.match(start.response.content, /All role DMs delivered/);
@@ -160,7 +175,7 @@ test('setup button opens a private draft; dropdowns save together and remain hos
 test('leader announcement mentions only the leader and persists across subsequent updates', async () => {
   const { games, handler } = fixture();
   await handler(interaction('create'));
-  await handler(interaction('setup', { options: { resistance: 1 } }));
+  await configureSinglePlayer(games, handler);
   await handler(interaction('start'));
   const game = games.requireGame('guild');
   assert.equal(game.leaderId, 'host');
