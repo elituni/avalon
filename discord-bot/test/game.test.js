@@ -170,3 +170,34 @@ test('leader survives DM retry and restart, and role messages end with a divider
   assert.ok(message.endsWith('────────────────────'));
   assert.ok(!message.includes('Keep this message private'));
 });
+
+test('Fool random information persists before DMs and survives failed delivery and restart', async t => {
+  const f = fixture(t, { disk: true });
+  await f.full();
+  await f.act('setup', '0', { mode: 'custom', counts: { ...emptyCounts(), Fool: 1, Merlin: 1, Percival: 1, Resistance: 1, Spy: 1, Morgana: 1 } });
+  for (let i = 0; i < 6; i++) f.blocked.add(String(i));
+  const game = await f.act('start', '0');
+  const fool = game.players.find(p => p.role === 'Fool');
+  const expected = roleMessage(game, fool);
+  assert.equal(fool.foolSeenIds.length, 2);
+  const recovered = new BotGames({ store: new GameStore(f.file), sendDM: f.sendDM });
+  assert.deepEqual(recovered.requireGame('guild').players, game.players);
+  f.blocked.clear();
+  await recovered.run('guild', () => recovered.retry(recovered.requireGame('guild'), '0'));
+  assert.equal(f.messages.find(m => m.id === fool.id).content, expected);
+  assert.match(expected, /Your role: Merlin/);
+  assert.ok(!expected.includes('Fool'));
+});
+
+test('legacy saved games gain a zero Fool count without changing assignments or delivery state', async t => {
+  const f = fixture(t, { disk: true });
+  await f.full();
+  const game = await f.act('start', '0');
+  const legacy = JSON.parse(readFileSync(f.file, 'utf8'));
+  delete legacy.games.guild.config.counts.Fool;
+  writeFileSync(f.file, JSON.stringify(legacy));
+  const restored = new GameStore(f.file).get('guild');
+  assert.equal(restored.config.counts.Fool, 0);
+  assert.deepEqual(restored.players, game.players);
+  assert.deepEqual(restored.delivered, game.delivered);
+});

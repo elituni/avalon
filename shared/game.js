@@ -6,8 +6,13 @@ export function startingInformation(me, players) {
   let visible = [];
   let heading = 'No players revealed';
   let explanation = 'Your role gives you no information about other players.';
-  if (me.role === 'Merlin') {
-    visible = players.filter(p => ROLE_INFO[p.role].team === 'Spy' && p.role !== 'Mordred');
+  if (me.role === 'Merlin' || me.role === 'Fool') {
+    if (me.role === 'Fool') {
+      if (!Array.isArray(me.foolSeenIds)) throw new Error('Missing saved Fool information.');
+      visible = players.filter(p => me.foolSeenIds.includes(p.id));
+    } else {
+      visible = players.filter(p => ROLE_INFO[p.role].team === 'Spy' && p.role !== 'Mordred');
+    }
     heading = 'Known spies';
     explanation = 'Mordred is hidden from you. These players are spies; their exact roles are not revealed.';
   } else if (me.role === 'Percival') {
@@ -46,10 +51,38 @@ export function assignRoles(players, config) {
     const j = randomInt(i + 1);
     [roles[i], roles[j]] = [roles[j], roles[i]];
   }
-  return players.map((player, index) => ({ ...player, role: roles[index] }));
+  const assigned = players.map((player, index) => ({ ...player, role: roles[index] }));
+  assignFoolKnowledge(assigned);
+  return assigned;
 }
 
 export function chooseLeader(players) {
   if (!players.length) throw new Error('A leader needs at least one player.');
   return players[randomInt(players.length)].id;
+}
+
+// Only the perceived role is sent to a player's browser or used in their DM.
+export function perceivedRole(player) {
+  return player.role === 'Fool' ? 'Merlin' : player.role ?? null;
+}
+
+export function randomPlayerIds(players, excludedId, count) {
+  const candidates = players.filter(player => player.id !== excludedId);
+  if (!Number.isInteger(count) || count < 0 || count > candidates.length) {
+    throw new Error('Choose a random reveal count within the available players.');
+  }
+  for (let i = 0; i < count; i++) {
+    const j = randomInt(i, candidates.length);
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  return candidates.slice(0, count).map(player => player.id);
+}
+
+// Draw once, after roles are final. Store IDs privately; never reroll on a read.
+export function assignFoolKnowledge(players) {
+  const spyCount = players.filter(p => ROLE_INFO[p.role].team === 'Spy').length;
+  for (const player of players) {
+    delete player.foolSeenIds;
+    if (player.role === 'Fool') player.foolSeenIds = randomPlayerIds(players, player.id, spyCount);
+  }
 }

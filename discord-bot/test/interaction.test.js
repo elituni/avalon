@@ -36,7 +36,7 @@ function fixture() {
 test('command schema exposes the agreed commands and custom setup semantics', () => {
   const json = command.toJSON();
   assert.deepEqual(json.options.map(o => o.name), ['create', 'setup', 'start', 'retry', 'end', 'help']);
-  assert.equal(json.options.find(o => o.name === 'setup').options.length, 11);
+  assert.equal(json.options.find(o => o.name === 'setup').options.length, 12);
   const options = values => ({ getInteger: key => values[key] ?? null });
   assert.equal(readSetup(options({ preset: 6 })).counts.Merlin, 1);
   const config = readSetup(options({ resistance: 3, spy: 2 }));
@@ -222,7 +222,7 @@ test('V2 setup validation errors preserve editable controls and support retrying
   assert.equal(save.response.flags, MessageFlags.IsComponentsV2);
   assert.equal(save.response.content, null);
   assert.match(save.response.components[1].data.content, /1 and 15/);
-  assert.equal(save.response.components.filter(c => c.data.type === 1).length, 12);
+  assert.equal(save.response.components.filter(c => c.data.type === 1).length, 13);
   assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
   count.values = ['2'];
   await handler(count);

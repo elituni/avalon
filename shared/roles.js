@@ -2,6 +2,7 @@
 export const ROLE_INFO = {
   Resistance: { team: 'Resistance', description: 'No starting information.' },
   Merlin: { team: 'Resistance', description: 'Sees spies except Mordred.' },
+  Fool: { team: 'Resistance', description: 'Believes they are Merlin. Sees a fixed random selection of other players as spies, matching the total Spy count. Hidden from Percival.' },
   Percival: { team: 'Resistance', description: 'Sees Merlin and Morgana, without knowing which is which.' },
   Tristan: { team: 'Resistance', description: 'Knows Isolde.' },
   Isolde: { team: 'Resistance', description: 'Knows Tristan.' },

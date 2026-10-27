@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { assignRoles, chooseLeader, startingInformation } from '../../shared/game.js';
+import { assignRoles, perceivedRole, chooseLeader, startingInformation } from '../../shared/game.js';
 import { ROLE_INFO, preset, totals, validateConfig } from '../../shared/roles.js';
 
 export class GameError extends Error {}
@@ -8,12 +8,13 @@ const safeName = name => String(name).replace(/[\\*_~`>|\[\]()]/g, '\\$&').slice
 
 export function roleMessage(game, player) {
   const info = startingInformation(player, game.players);
+  const role = perceivedRole(player);
   return [
     `**Avalon · Game ${game.id}**`,
     `Server: ${safeName(game.guildName)}`,
-    `**Your role: ${player.role}**`,
+    `**Your role: ${role}**`,
     `**Team: ${ROLE_INFO[player.role].team}**`,
-    ROLE_INFO[player.role].description,
+    ROLE_INFO[role].description,
     '', `**${info.heading}**`, info.explanation,
     ...info.players.map(p => `• ${safeName(p.name)} (ID: ${p.id})`),
     ...(info.players.length ? [] : ['No players revealed.']),

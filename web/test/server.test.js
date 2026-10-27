@@ -584,3 +584,33 @@ test('first leader is public, stable on reconnect, and cleared on reset', async 
   assert.equal((await players[0].call()).data.leaderId, started.leaderId);
   assert.equal((await players[0].call('/api/reset')).data.leaderId, null);
 });
+
+test('Fool is privately Merlin over HTTP and SSE, with stable random knowledge and no Percival visibility', async t => {
+  const { emptyCounts } = await import('../../shared/roles.js');
+  const { client, url } = await setup(t);
+  const host = client();
+  await host.call('/api/join', { name: 'Host' });
+  const counts = { ...emptyCounts(), Fool: 1, Percival: 1, Resistance: 2, Spy: 1, Mordred: 1, Oberon: 1 };
+  await host.call('/api/config', { mode: 'custom', counts });
+  const clients = [host];
+  for (let i = 1; i < 7; i++) {
+    const c = client(); await c.call('/api/join', { name: `Person ${i}` }); clients.push(c);
+  }
+  await host.call('/api/start');
+  const states = await Promise.all(clients.map(async c => (await c.call()).data));
+  const index = states.findIndex(s => s.me.role === 'Merlin'); // No real Merlin in this setup.
+  assert.ok(index >= 0);
+  const me = states[index].me;
+  assert.equal(me.team, 'Resistance');
+  assert.equal(me.information.players.length, 3);
+  assert.equal(new Set(me.information.players.map(p => p.id)).size, 3);
+  assert.ok(!me.information.players.some(p => p.id === me.id));
+  assert.ok(!JSON.stringify(me).includes('Fool'));
+  assert.ok(!JSON.stringify(me).includes('foolSeenIds'));
+  assert.deepEqual(states.find(s => s.me.role === 'Percival').me.information.players, []);
+  assert.deepEqual((await clients[index].call('/api/heartbeat')).data.me, me);
+  const stream = await streamState(t, url, clients[index].cookie);
+  assert.deepEqual((await stream.next()).me, me);
+  await host.call('/api/reset');
+  assert.equal((await stream.next()).me.role, null);
+});

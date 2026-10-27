@@ -30,13 +30,13 @@ npm --prefix web test
 
 For all website and bot tests, first run `npm --prefix discord-bot ci`, then `npm test`.
 
-Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, fresh-server reset, host permissions, transfers, kicks, automatic host succession, configuration validation, all ten roles’ private starting information, and custom 15-player games.
+Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, fresh-server reset, host permissions, transfers, kicks, automatic host succession, configuration validation, all eleven roles’ private starting information, and custom 15-player games.
 
 ## Role setup and starting information
 
 The player grid is the main view for everyone, including the host. Role counts appear in the **Game setup** sidebar (below the roster on phones). The host opens **Edit setup**, adjusts counts, then selects **Save setup**. Role explanations are available under **Role guide** and private **Role details**. All players can see the saved distribution; nobody can see the assignments before starting. Presets cover 5–10 players plus the custom 15-player example. The server rejects changes by non-hosts, changes after starting, and reductions below the current roster size.
 
-Presets use the original game’s team counts, but they are suggestions only. The host may save any mix of the ten roles: repeated special roles, no Merlin/Assassin/Percival, or even a single team. The only role-count checks are nonnegative whole numbers and a total of 1–15 seats. Changes remain host-only and lock when the game starts. Human players cannot be silently removed by reducing the seat count.
+Presets use the original game’s team counts, but they are suggestions only. The host may save any mix of the eleven roles: repeated special roles, no Merlin/Assassin/Percival, or even a single team. The only role-count checks are nonnegative whole numbers and a total of 1–15 seats. Changes remain host-only and lock when the game starts. Human players cannot be silently removed by reducing the seat count.
 
 - Merlin sees spies except Mordred, including Oberon, without exact roles.
 - Percival sees Merlin and Morgana together without labels distinguishing them. If only one of those role types exists, the public distribution makes the reveal unambiguous.
@@ -54,7 +54,7 @@ Quest play, voting, and assassination (including the lovers win condition) are n
 
 The default listener is `0.0.0.0:3000`. Override with `HOST` and `PORT`. The current IP-based deployment uses HTTP; private role responses are access-controlled by session but transport is not encrypted. HTTPS should be added before relying on role secrecy over untrusted networks.
 
-The API provides `GET /api/state`, `GET /api/events` (SSE), `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/reset`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all ten role counts (see `shared/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
+The API provides `GET /api/state`, `GET /api/events` (SSE), `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/reset`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all eleven role counts (see `shared/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
 
 ## Deploy to the Droplet
 
@@ -82,3 +82,5 @@ ssh -F ~/.ssh/config avalon-droplet 'journalctl -u avalon -n 50 --no-pager'
 Run `AVALON_DEMO=1 npm start` to seed three always-connected NPCs and a four-player UI demo (Merlin, Percival, Morgana, and Assassin). The host can change this setup freely. Join as `laze` and start; that player receives Percival when it is included, while the other roles are shuffled among NPCs. The page labels this as a demo. NPCs occupy seats until kicked or removed by a smaller setup, and the first human player is host. The host can edit the distribution freely through **Edit setup**. If Percival remains included, laze receives it; otherwise laze receives a random role. Reducing the demo seat count removes excess NPCs. Increasing it leaves open seats for other human players. NPCs simulate seats only, not gameplay.
 
 Normal mode is unchanged when `AVALON_DEMO` is unset. On the Droplet the demo can be enabled through `/etc/systemd/system/avalon.service.d/demo.conf` containing `[Service]` and `Environment=AVALON_DEMO=1`. Remove that specific override, run `systemctl daemon-reload`, and restart `avalon` to restore normal random assignments and an empty six-player lobby.
+
+Fool is an optional Resistance role (zero in the presets). Its private role is shown as Merlin, with the same Merlin text. At the start of each game, each Fool gets a random selection of other players of any team, without duplicates; its size equals the total number of spies, including Mordred and Oberon. The selection stays fixed through reconnects, DM retries, and bot restarts. Percival sees only real Merlins and Morganas, never Fools. The true Fool role and selected IDs stay in server storage, not in the player's web response or DM. Public setup counts still show the Fool count.

@@ -14,6 +14,10 @@ export class GameStore {
         throw new Error('Unsupported bot state file.');
       }
       this.games = saved.games;
+      // Saved games from before Fool was introduced keep all assignments intact.
+      for (const game of Object.values(this.games)) {
+        if (game.config?.counts && !Object.hasOwn(game.config.counts, 'Fool')) game.config.counts.Fool = 0;
+      }
       chmodSync(file, 0o600);
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
