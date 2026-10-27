@@ -1,86 +1,17 @@
-# Avalon lobby and private role reveal
+# Contributing to Avalon
 
-The website lives in `web/`, the Discord bot in `discord-bot/`, and shared role definitions, validation, assignment, and starting information in `shared/`. Games and player identities are separate. The website uses Node.js and plain browser JavaScript with no dependencies or build step. See [the bot setup guide](discord-bot/README.md) for Discord commands and installation. Commands below run from the repository root.
+Contributions should only change files in `shared/`. This folder contains the game rules used by both the website and Discord bot.
 
-## Run locally
+- `shared/roles.js`: role definitions, teams, descriptions, presets, and setup validation.
+- `shared/game.js`: role assignment, starting information, randomization, and leader selection.
 
-Use Node.js 22 or newer:
+Keep changes focused on the shared game logic. Preserve role privacy and keep randomized starting information consistent throughout a game.
 
-```sh
-npm start
-```
-
-Open http://localhost:3000. Enter a unique display name and join. The host chooses the role distribution; its total determines the number of seats. Every seat must be filled by a connected player to start. Only the host may start. The default remains six players: two Resistance and one each of Merlin, Morgana, Assassin, and Percival. Each browser receives its own role and only the starting information that role is allowed to see.
-
-The first player to join becomes the host (viewing the page alone does not take a seat). Before starting, the host can click another player’s card to transfer hosting or kick them. NPCs can be kicked, but hosting can only be transferred to a connected human. Every seated human, including the host, has a **Leave table** button. These controls are enforced by the server and unavailable after roles are dealt. Only the host sees Start game, enabled when all configured seats are connected. During the game the host can select **End game / Reset** to return everyone to the lobby, preserving seats and setup while clearing roles and private information. Each new game starts with information concealed.
-
-If the host leaves or exceeds the 15-second disconnect grace period, hosting passes to the earliest joined connected human player, including during a game so reset remains available. Reconnecting does not reclaim hosting. Kicking removes a seat from all of that player’s tabs; it is not a ban, and the player may explicitly join again if space is available.
-
-A browser session cookie identifies a player across tabs and refreshes. To test six players, use six separate browser profiles or devices (ordinary tabs share one seat). Private windows from the same browser may also share cookies.
-
-Browsers receive immediate, session-specific updates over server-sent events (SSE). Each connection and reconnection receives a fresh snapshot; private roles are sent only to their own session. Browsers still send heartbeats every three seconds for presence detection and as a polling fallback if streaming is unavailable. Returning to a visible tab reconnects the stream and refreshes presence. A player is disconnected after 15 seconds without one, including when a device sleeps or the browser suspends background tabs. Before starting, disconnected seats can be reclaimed by new players. Players can also explicitly leave the lobby. After starting, the roster is locked and reconnecting restores the original role.
-
-Starting chooses a random first leader and shows a **Leader** badge on that player. The leader stays the same through reconnects and clears on reset; this is separate from the host.
-
-State is held in one server process. Restarting or deploying clears the lobby and assignments. This version stops at role reveal: no quests, voting, or assassination action yet. A session identifies a browser, not a verified person.
+Before submitting a pull request, use Node.js 22.12 or newer and run:
 
 ```sh
-npm --prefix web test
+npm --prefix discord-bot ci
+npm test
 ```
 
-For all website and bot tests, first run `npm --prefix discord-bot ci`, then `npm test`.
-
-Tests cover capacity, duplicate tabs, simultaneous starts, exact role counts, role privacy, heartbeat expiry, reconnects, locked rosters, fresh-server reset, host permissions, transfers, kicks, automatic host succession, configuration validation, all eleven roles’ private starting information, and custom 15-player games.
-
-## Role setup and starting information
-
-The player grid is the main view for everyone, including the host. Role counts appear in the **Game setup** sidebar (below the roster on phones). The host opens **Edit setup**, adjusts counts, then selects **Save setup**. Role explanations are available under **Role guide** and private **Role details**. All players can see the saved distribution; nobody can see the assignments before starting. Presets cover 5–10 players plus the custom 15-player example. The server rejects changes by non-hosts, changes after starting, and reductions below the current roster size.
-
-Presets use the original game’s team counts, but they are suggestions only. The host may save any mix of the eleven roles: repeated special roles, no Merlin/Assassin/Percival, or even a single team. The only role-count checks are nonnegative whole numbers and a total of 1–15 seats. Changes remain host-only and lock when the game starts. Human players cannot be silently removed by reducing the seat count.
-
-- Merlin sees spies except Mordred, including Oberon, without exact roles.
-- Percival sees Merlin and Morgana together without labels distinguishing them. If only one of those role types exists, the public distribution makes the reveal unambiguous.
-- Assassin, Morgana, Mordred, and ordinary spies see their spy teammates except Oberon, without exact roles.
-- Tristan sees all Isoldes; Isolde sees all Tristans. Both are Resistance. Repeated and unpaired lovers are allowed. Their badges and pink highlights are private and follow the reveal toggle.
-- Resistance and Oberon receive no other-player identities. Oberon still knows their own Spy allegiance.
-
-Repeated special roles in custom mode each receive the same visibility rules. A custom Percival sees all Merlin/Morgana candidates; Merlins do not learn other Merlins. Candidate lists follow public seating order rather than sorting by secret role. Assignments and information persist through refreshes and reconnects. The UI starts concealed as **Your role: ??**; click to reveal your role, team, private information, and player highlights, and click again to hide them. Live updates preserve the toggle state, while a page refresh conceals it again. This is a screen-privacy control; the authenticated browser still receives its own private state. The host has no special access to anyone else’s role or knowledge.
-
-Rules checked against the original [Avalon rulebook PDF](https://avalon.fun/pdfs/rules.pdf) and its [text transcription](https://www.rulespal.com/resistance-avalon/rulebook). Tristan/Isolde follow [ProAvalon’s implementation](https://github.com/vck3000/ProAvalon/tree/master/src/gameplay/gameEngine).
-
-Quest play, voting, and assassination (including the lovers win condition) are not implemented yet.
-
-## Configuration
-
-The default listener is `0.0.0.0:3000`. Override with `HOST` and `PORT`. The current IP-based deployment uses HTTP; private role responses are access-controlled by session but transport is not encrypted. HTTPS should be added before relying on role secrecy over untrusted networks.
-
-The API provides `GET /api/state`, `GET /api/events` (SSE), `GET /api/health`, and POST endpoints `/api/join`, `/api/heartbeat`, `/api/start`, `/api/reset`, `/api/leave`, `/api/host`, `/api/kick`, and `/api/config`. Join accepts `{ "name": "Alice" }`. Host transfer and kick accept `{ "playerId": "..." }`. Configuration accepts `{ "mode": "standard", "counts": { ... } }` with all eleven role counts (see `shared/roles.js`). Other actions have no body. All responses disable caching, and modifying requests reject cross-site origins.
-
-## Deploy to the Droplet
-
-With local Node.js, Git, rsync, and SSH available, commit your changes and run:
-
-```sh
-bash scripts/deploy.sh
-```
-
-The default target is the `avalon-droplet` SSH alias (root at `178.128.7.152`). An alternate target can be passed as the first argument. The script uses `~/.ssh/config`; override this with `AVALON_SSH_CONFIG` if needed.
-
-Website deployment requires a clean working tree, runs the website tests, and transfers only the committed app and deployment files via rsync. Each release records its Git revision in `/opt/avalon/current/REVISION`. First-time setup installs an official Node.js 24 binary under `/opt/node`, verifies its published SHA-256 checksum, and creates an unprivileged `avalon` service user. Node.js is not automatically upgraded on subsequent deployments.
-
-The systemd service starts on boot, restarts after crashes, and listens on port 3000. The script allows port 3000 and SSH port 22 if UFW is active; any DigitalOcean cloud firewall must also permit port 3000. Deployment checks the API locally on the Droplet and restores the previous release if that check fails. Previous release directories are retained under `/opt/avalon/releases`.
-
-Open http://178.128.7.152:3000 and verify from a phone on cellular data. Every deployment restarts the app and clears the lobby and roles.
-
-```sh
-ssh -F ~/.ssh/config avalon-droplet 'systemctl status avalon --no-pager'
-ssh -F ~/.ssh/config avalon-droplet 'journalctl -u avalon -n 50 --no-pager'
-```
-
-## Temporary Percival UI demo
-
-Run `AVALON_DEMO=1 npm start` to seed three always-connected NPCs and a four-player UI demo (Merlin, Percival, Morgana, and Assassin). The host can change this setup freely. Join as `laze` and start; that player receives Percival when it is included, while the other roles are shuffled among NPCs. The page labels this as a demo. NPCs occupy seats until kicked or removed by a smaller setup, and the first human player is host. The host can edit the distribution freely through **Edit setup**. If Percival remains included, laze receives it; otherwise laze receives a random role. Reducing the demo seat count removes excess NPCs. Increasing it leaves open seats for other human players. NPCs simulate seats only, not gameplay.
-
-Normal mode is unchanged when `AVALON_DEMO` is unset. On the Droplet the demo can be enabled through `/etc/systemd/system/avalon.service.d/demo.conf` containing `[Service]` and `Environment=AVALON_DEMO=1`. Remove that specific override, run `systemctl daemon-reload`, and restart `avalon` to restore normal random assignments and an empty six-player lobby.
-
-Fool is an optional Resistance role (zero in the presets). Its private role is shown as Merlin, with the same Merlin text. At the start of each game, each Fool gets a random selection of other players of any team, without duplicates; its size equals the total number of spies, including Mordred and Oberon. The selection stays fixed through reconnects, DM retries, and bot restarts. Percival sees only real Merlins and Morganas, never Fools. The true Fool role and selected IDs stay in server storage, not in the player's web response or DM. Public setup counts still show the Fool count.
+Describe the rule change and its expected behavior in your pull request. If it requires changes outside `shared/`, open an issue to discuss it first.
