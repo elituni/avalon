@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, escapeMarkdown } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, TextDisplayBuilder, MessageFlags, escapeMarkdown } from 'discord.js';
 import { ROLE_INFO, totals } from '../../shared/roles.js';
 
 export function lobbyMessage(game) {
@@ -45,32 +45,33 @@ export function actionSummary(action, game) {
   return { create: 'Lobby created. You are the host and have joined.', join: 'You are in the lobby.', leave: 'You left the lobby.', setup: 'Role setup saved.' }[action];
 }
 
-export const SETUP_PAGE_SIZE = 3;
-export const SETUP_PAGE_COUNT = Math.ceil(Object.keys(ROLE_INFO).length / SETUP_PAGE_SIZE);
+export function setupNotice(content) {
+  return {
+    flags: MessageFlags.IsComponentsV2, content: null, embeds: [],
+    components: [new TextDisplayBuilder().setContent(content)], allowedMentions: { parse: [] },
+  };
+}
 
-export function setupMessage(game, page = 0) {
+export function setupMessage(game, error = null) {
   const counts = totals(game.config);
-  const roles = Object.keys(ROLE_INFO).slice(page * SETUP_PAGE_SIZE, (page + 1) * SETUP_PAGE_SIZE);
-  const rows = [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
-    .setCustomId(`avalon:${game.id}:preset`).setPlaceholder('Choose a player-count preset')
-    .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) }))))];
-  for (const role of roles) rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
-    .setCustomId(`avalon:${game.id}:count:${role}`).setPlaceholder(`${role}: ${game.config.counts[role]}`)
-    .addOptions(...Array.from({ length: 16 }, (_, n) => ({
-      label: `${role}: ${n}`, value: String(n), default: n === game.config.counts[role],
-    })))));
-  rows.push(new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`avalon:${game.id}:setuppage:${Math.max(0, page - 1)}`)
-      .setLabel('Previous roles').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-    new ButtonBuilder().setCustomId(`avalon:${game.id}:setuppage:${Math.min(SETUP_PAGE_COUNT - 1, page + 1)}`)
-      .setLabel('More roles').setStyle(ButtonStyle.Secondary).setDisabled(page === SETUP_PAGE_COUNT - 1),
-    new ButtonBuilder().setCustomId(`avalon:${game.id}:savesetup`).setLabel('Save setup').setStyle(ButtonStyle.Success),
-  ));
   const summary = Object.entries(game.config.counts).filter(([, n]) => n > 0)
     .map(([role, n]) => `${role}: **${n}**`).join(' · ') || 'No roles selected.';
-  return {
-    content: `**Game setup** · ${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy\n` +
-      summary + `\n**Roles · page ${page + 1}/${SETUP_PAGE_COUNT}**`,
-    embeds: [], components: rows, allowedMentions: { parse: [] },
-  };
+  const payload = setupNotice(`**Game setup** · ${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy\n${summary}`);
+  const rows = payload.components;
+  if (error) rows.push(new TextDisplayBuilder().setContent(error));
+  rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+    .setCustomId(`avalon:${game.id}:preset`).setPlaceholder('Choose a player-count preset')
+    .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) })))));
+  for (const role of Object.keys(ROLE_INFO)) {
+    rows.push(new TextDisplayBuilder().setContent(`**${role}**`));
+    rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+      .setCustomId(`avalon:${game.id}:count:${role}`).setPlaceholder(String(game.config.counts[role]))
+      .addOptions(...Array.from({ length: 16 }, (_, n) => ({
+        label: String(n), value: String(n), default: n === game.config.counts[role],
+      })))));
+  }
+  rows.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`avalon:${game.id}:savesetup`).setLabel('Save setup').setStyle(ButtonStyle.Success),
+  ));
+  return payload;
 }

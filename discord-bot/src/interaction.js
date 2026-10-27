@@ -3,7 +3,7 @@ import { ROLE_INFO, preset } from '../../shared/roles.js';
 import { ChannelType, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { GameError } from './game.js';
 import { help, readSetup } from './commands.js';
-import { actionSummary, lobbyMessage, setupMessage, SETUP_PAGE_COUNT } from './presentation.js';
+import { actionSummary, lobbyMessage, setupMessage, setupNotice } from './presentation.js';
 
 export async function publishGame(client, store, game) {
   const channel = await client.channels.fetch(game.channelId);
@@ -61,7 +61,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
           const openSetup = action === 'setup' && (button || !['preset', ...Object.keys(ROLE_INFO).map(r => r.toLowerCase())].some(key => interaction.options.getInteger(key) !== null));
           if (openSetup || editorAction) {
             games.host(game, user.id); games.lobby(game);
-            if (openSetup) drafts.set(game.guildId, { gameId: game.id, userId: user.id, config: structuredClone(game.config), page: 0 });
+            if (openSetup) drafts.set(game.guildId, { gameId: game.id, userId: user.id, config: structuredClone(game.config) });
             const draft = drafts.get(game.guildId);
             if (!draft || draft.gameId !== game.id || draft.userId !== user.id) throw new GameError('Reopen Edit setup to start a new draft.');
             const value = interaction.values?.[0];
@@ -69,16 +69,12 @@ export function interactionHandler({ client, games, publish = game => publishGam
               if (!['5', '6', '7', '8', '9', '10', '15'].includes(value)) throw new GameError('Choose a supported preset.');
               draft.config = preset(Number(value));
             }
-            if (action === 'setuppage') {
-              if (!/^\d+$/.test(roleArgument || '') || Number(roleArgument) >= SETUP_PAGE_COUNT) throw new GameError('Choose a valid setup page.');
-              draft.page = Number(roleArgument);
-            }
             if (action === 'count') {
               if (!Object.hasOwn(ROLE_INFO, roleArgument) || !/^(?:[0-9]|1[0-5])$/.test(value || '')) throw new GameError('Choose a valid role count.');
               draft.config.mode = 'custom';
               draft.config.counts[roleArgument] = Number(value);
             }
-            if (action !== 'savesetup') return await interaction.editReply(setupMessage({ ...game, config: draft.config }, draft.page));
+            if (action !== 'savesetup') return await interaction.editReply(setupMessage({ ...game, config: draft.config }));
             game = games.setup(game, user.id, draft.config);
             drafts.delete(game.guildId);
           }
@@ -96,14 +92,24 @@ export function interactionHandler({ client, games, publish = game => publishGam
           content += ' The lobby message could not be updated. Check my channel permissions; the game change is saved. A later action will retry the update.';
           console.error('Could not update an Avalon lobby message.');
         }
-        await interaction.editReply({ content, components: [], embeds: [], allowedMentions: { parse: [] } });
+        await interaction.editReply(editorAction ? setupNotice(content) : { content, components: [], embeds: [], allowedMentions: { parse: [] } });
       });
     } catch (error) {
       // Discord errors can include request bodies/tokens; never log the raw error.
       if (!(error instanceof GameError)) console.error('Avalon action failed; check service and state-file permissions.');
       const content = error instanceof GameError ? error.message : 'The action could not finish. Existing roles remain saved; ask the host to retry or check the bot service.';
       try {
-        if (interaction.deferred || interaction.replied) await interaction.editReply({ content, allowedMentions: { parse: [] } });
+        if (interaction.deferred || interaction.replied) {
+          let payload = { content, allowedMentions: { parse: [] } };
+          if (editorAction) {
+            const draft = drafts.get(interaction.guildId);
+            const game = games.store.get(interaction.guildId);
+            payload = game?.phase === 'lobby' && game.hostId === interaction.user.id &&
+              draft?.gameId === game.id && draft.userId === interaction.user.id
+              ? setupMessage({ ...game, config: draft.config }, content) : setupNotice(content);
+          }
+          await interaction.editReply(payload);
+        }
         else await interaction.reply({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
       } catch { console.error('Could not acknowledge a Discord interaction.'); }
     }

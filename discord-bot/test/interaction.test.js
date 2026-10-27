@@ -5,7 +5,7 @@ import { BotGames } from '../src/game.js';
 import { GameStore } from '../src/store.js';
 import { interactionHandler, publishGame } from '../src/interaction.js';
 import { command, readSetup } from '../src/commands.js';
-import { lobbyMessage, setupMessage, SETUP_PAGE_COUNT } from '../src/presentation.js';
+import { lobbyMessage, setupMessage } from '../src/presentation.js';
 
 function interaction(action, { userId = 'host', gameId, messageId = 'message', channelId = 'channel', options = {} } = {}) {
   const button = Boolean(gameId);
@@ -131,9 +131,9 @@ test('setup button opens a private draft; dropdowns save together and remain hos
   assert.match(denied.response.content, /Only the host/);
   const open = interaction('setup', { gameId: game.id });
   await handler(open);
-  assert.match(open.response.content, /Game setup/);
-  assert.equal(open.response.components.length, 5);
-  assert.ok(!open.response.content.includes("Oberon:"));
+  assert.match(open.response.components[0].data.content, /Game setup/);
+  assert.equal(open.response.flags, MessageFlags.IsComponentsV2);
+  assert.ok(!open.response.components[0].data.content.includes("Oberon:"));
   function select(action, value) {
     const i = interaction(action, { gameId: game.id });
     i.isButton = () => false;
@@ -144,21 +144,17 @@ test('setup button opens a private draft; dropdowns save together and remain hos
   }
   await handler(select('preset', '5'));
   assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
-  const page = interaction('setuppage:1', { gameId: game.id, messageId: 'private-editor' });
-  page.deferUpdate = async () => { page.deferred = true; };
-  await handler(page);
-  assert.match(page.response.content, /page 2\/4/);
   await handler(select('count:Merlin', '0'));
   await handler(select('count:Resistance', '2'));
   const save = interaction('savesetup', { gameId: game.id, messageId: 'private-editor' });
   save.deferUpdate = async () => { save.deferred = true; };
   await handler(save);
-  assert.match(save.response.content, /saved/);
+  assert.match(save.response.components[0].data.content, /saved/);
   assert.equal(games.requireGame('guild').config.counts.Merlin, 0);
   assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
   const stale = select('preset', '6');
   await handler(stale);
-  assert.match(stale.response.content, /Reopen/);
+  assert.match(stale.response.components[0].data.content, /Reopen/);
 });
 
 test('leader announcement mentions only the leader and persists across subsequent updates', async () => {
@@ -181,25 +177,55 @@ test('leader announcement mentions only the leader and persists across subsequen
   assert.match(JSON.stringify(lobbyMessage(game)), /Leader/);
 });
 
-test('setup pages expose direct counts for every role and omit zero counts from the summary', async () => {
+test('one setup message contains all labeled numeric menus within the V2 limit', async () => {
   const { games, handler } = fixture();
   await handler(interaction('create'));
   const game = games.requireGame('guild');
+  const view = setupMessage(game);
+  assert.equal(view.flags, MessageFlags.IsComponentsV2);
+  assert.equal(view.content, null);
+  assert.deepEqual(view.embeds, []);
+  assert.ok(!view.components[0].data.content.includes('Tristan:'));
+  const components = view.components.map(c => c.toJSON());
+  const count = items => items.reduce((n, c) => n + 1 + count(c.components || []), 0);
+  assert.ok(count(components) <= 40);
   const seen = [];
-  for (let page = 0; page < SETUP_PAGE_COUNT; page++) {
-    const view = setupMessage(game, page);
-    assert.ok(view.components.length <= 5);
-    assert.ok(!view.content.includes('Tristan:'));
-    for (const row of view.components) {
-      for (const component of row.toJSON().components) {
-        if (!component.custom_id.includes(':count:')) continue;
-        const role = component.custom_id.split(':')[3];
-        seen.push(role);
-        assert.equal(component.options.length, 16);
-        assert.equal(component.options.find(option => option.default).value, String(game.config.counts[role]));
-        assert.ok(component.options.every(option => option.label.startsWith(role + ':')));
-      }
+  for (let i = 0; i < components.length; i++) {
+    for (const component of components[i].components || []) {
+      assert.ok(!component.custom_id.includes('setuppage'));
+      if (!component.custom_id.includes(':count:')) continue;
+      const role = component.custom_id.split(':')[3];
+      seen.push(role);
+      assert.equal(components[i - 1].content, `**${role}**`);
+      assert.equal(component.options.length, 16);
+      assert.equal(component.options.find(option => option.default).value, String(game.config.counts[role]));
+      assert.ok(component.options.every(option => /^\d+$/.test(option.label)));
     }
   }
   assert.deepEqual(seen.sort(), Object.keys(game.config.counts).sort());
+});
+
+test('V2 setup validation errors preserve editable controls and support retrying save', async () => {
+  const { games, handler } = fixture();
+  await handler(interaction('create'));
+  const game = games.requireGame('guild');
+  await handler(interaction('setup', { gameId: game.id }));
+  const count = interaction('count:Resistance', { gameId: game.id });
+  count.isButton = () => false;
+  count.isStringSelectMenu = () => true;
+  count.values = ['15'];
+  count.deferUpdate = async () => { count.deferred = true; };
+  await handler(count);
+  const save = interaction('savesetup', { gameId: game.id });
+  save.deferUpdate = async () => { save.deferred = true; };
+  await handler(save);
+  assert.equal(save.response.flags, MessageFlags.IsComponentsV2);
+  assert.equal(save.response.content, null);
+  assert.match(save.response.components[1].data.content, /1 and 15/);
+  assert.equal(save.response.components.filter(c => c.data.type === 1).length, 12);
+  assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
+  count.values = ['2'];
+  await handler(count);
+  await handler(save);
+  assert.match(save.response.components[0].data.content, /saved/);
 });
