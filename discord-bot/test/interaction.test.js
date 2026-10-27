@@ -5,7 +5,7 @@ import { BotGames } from '../src/game.js';
 import { GameStore } from '../src/store.js';
 import { interactionHandler, publishGame } from '../src/interaction.js';
 import { command, readSetup } from '../src/commands.js';
-import { lobbyMessage } from '../src/presentation.js';
+import { lobbyMessage, setupMessage, SETUP_PAGE_COUNT } from '../src/presentation.js';
 
 function interaction(action, { userId = 'host', gameId, messageId = 'message', channelId = 'channel', options = {} } = {}) {
   const button = Boolean(gameId);
@@ -132,7 +132,8 @@ test('setup button opens a private draft; dropdowns save together and remain hos
   const open = interaction('setup', { gameId: game.id });
   await handler(open);
   assert.match(open.response.content, /Game setup/);
-  assert.equal(open.response.components.length, 3);
+  assert.equal(open.response.components.length, 5);
+  assert.ok(!open.response.content.includes("Oberon:"));
   function select(action, value) {
     const i = interaction(action, { gameId: game.id });
     i.isButton = () => false;
@@ -143,9 +144,10 @@ test('setup button opens a private draft; dropdowns save together and remain hos
   }
   await handler(select('preset', '5'));
   assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
-  const role = select('editrole', 'Merlin');
-  await handler(role);
-  assert.equal(role.response.components.length, 4);
+  const page = interaction('setuppage:1', { gameId: game.id, messageId: 'private-editor' });
+  page.deferUpdate = async () => { page.deferred = true; };
+  await handler(page);
+  assert.match(page.response.content, /page 2\/4/);
   await handler(select('count:Merlin', '0'));
   await handler(select('count:Resistance', '2'));
   const save = interaction('savesetup', { gameId: game.id, messageId: 'private-editor' });
@@ -177,4 +179,27 @@ test('leader announcement mentions only the leader and persists across subsequen
   assert.equal(sent[0].enforceNonce, true);
   assert.equal(games.requireGame('guild').leaderAnnouncementId, 'announcement');
   assert.match(JSON.stringify(lobbyMessage(game)), /Leader/);
+});
+
+test('setup pages expose direct counts for every role and omit zero counts from the summary', async () => {
+  const { games, handler } = fixture();
+  await handler(interaction('create'));
+  const game = games.requireGame('guild');
+  const seen = [];
+  for (let page = 0; page < SETUP_PAGE_COUNT; page++) {
+    const view = setupMessage(game, page);
+    assert.ok(view.components.length <= 5);
+    assert.ok(!view.content.includes('Tristan:'));
+    for (const row of view.components) {
+      for (const component of row.toJSON().components) {
+        if (!component.custom_id.includes(':count:')) continue;
+        const role = component.custom_id.split(':')[3];
+        seen.push(role);
+        assert.equal(component.options.length, 16);
+        assert.equal(component.options.find(option => option.default).value, String(game.config.counts[role]));
+        assert.ok(component.options.every(option => option.label.startsWith(role + ':')));
+      }
+    }
+  }
+  assert.deepEqual(seen.sort(), Object.keys(game.config.counts).sort());
 });

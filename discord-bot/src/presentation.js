@@ -45,25 +45,33 @@ export function actionSummary(action, game) {
   return { create: 'Lobby created. You are the host and have joined.', join: 'You are in the lobby.', leave: 'You left the lobby.', setup: 'Role setup saved.' }[action];
 }
 
-export function setupMessage(game, selectedRole = null) {
+export const SETUP_PAGE_SIZE = 3;
+export const SETUP_PAGE_COUNT = Math.ceil(Object.keys(ROLE_INFO).length / SETUP_PAGE_SIZE);
+
+export function setupMessage(game, page = 0) {
   const counts = totals(game.config);
-  const rows = [
-    new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
-      .setCustomId(`avalon:${game.id}:preset`).setPlaceholder('Choose a player-count preset')
-      .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) })))),
-    new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
-      .setCustomId(`avalon:${game.id}:editrole`).setPlaceholder('Choose a role to adjust')
-      .addOptions(...Object.keys(ROLE_INFO).map(role => ({ label: `${role} ×${game.config.counts[role]}`, value: role, default: role === selectedRole })))),
-  ];
-  if (selectedRole) rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
-    .setCustomId(`avalon:${game.id}:count:${selectedRole}`).setPlaceholder(`Number of ${selectedRole} roles`)
-    .addOptions(...Array.from({ length: 16 }, (_, n) => ({ label: String(n), value: String(n), default: n === game.config.counts[selectedRole] })))));
-  rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder()
-    .setCustomId(`avalon:${game.id}:savesetup`).setLabel('Save setup').setStyle(ButtonStyle.Success)));
+  const roles = Object.keys(ROLE_INFO).slice(page * SETUP_PAGE_SIZE, (page + 1) * SETUP_PAGE_SIZE);
+  const rows = [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+    .setCustomId(`avalon:${game.id}:preset`).setPlaceholder('Choose a player-count preset')
+    .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) }))))];
+  for (const role of roles) rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+    .setCustomId(`avalon:${game.id}:count:${role}`).setPlaceholder(`${role}: ${game.config.counts[role]}`)
+    .addOptions(...Array.from({ length: 16 }, (_, n) => ({
+      label: `${role}: ${n}`, value: String(n), default: n === game.config.counts[role],
+    })))));
+  rows.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`avalon:${game.id}:setuppage:${Math.max(0, page - 1)}`)
+      .setLabel('Previous roles').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId(`avalon:${game.id}:setuppage:${Math.min(SETUP_PAGE_COUNT - 1, page + 1)}`)
+      .setLabel('More roles').setStyle(ButtonStyle.Secondary).setDisabled(page === SETUP_PAGE_COUNT - 1),
+    new ButtonBuilder().setCustomId(`avalon:${game.id}:savesetup`).setLabel('Save setup').setStyle(ButtonStyle.Success),
+  ));
+  const summary = Object.entries(game.config.counts).filter(([, n]) => n > 0)
+    .map(([role, n]) => `${role}: **${n}**`).join(' · ') || 'No roles selected.';
   return {
     content: `**Game setup** · ${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy\n` +
-      Object.entries(game.config.counts).map(([role, n]) => `${role}: **${n}**`).join(' · ') +
-      '\nChoose a preset, or select a role and its count. Click **Save setup** to apply your changes. The saved setup must have 1–15 seats and enough seats for everyone joined.',
+      summary + `\n**Roles · page ${page + 1}/${SETUP_PAGE_COUNT}**\n` +
+      'Pick a number directly beside each role below, or choose a preset. Click **Save setup** to apply all pages. Keep 1–15 seats and enough seats for everyone joined.',
     embeds: [], components: rows, allowedMentions: { parse: [] },
   };
 }

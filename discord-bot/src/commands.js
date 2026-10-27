@@ -41,7 +41,7 @@ export const help = [
   '**Avalon — lobbies and role DMs**',
   '`/avalon create` creates a lobby and joins you as host. One game per server.',
   'Use **Join** / **Leave** in the lobby. Joining sends a test DM; enable DMs from this server.',
-  'Click **Edit setup** for preset, role, and count dropdowns, then **Save setup**. `/avalon setup` also opens the editor.',
+  'Click **Edit setup** for presets and a number dropdown for each role, then **Save setup**. `/avalon setup` also opens the editor.',
   '`/avalon setup preset:6` still selects a preset. Or supply role counts; omitted roles become zero.',
   '`/avalon start` (or **Start**) deals roles and DMs starting information once all seats are filled.',
   '`/avalon retry` retries only pending DMs, preserving roles.',

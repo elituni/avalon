@@ -3,7 +3,7 @@ import { ROLE_INFO, preset } from '../../shared/roles.js';
 import { ChannelType, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { GameError } from './game.js';
 import { help, readSetup } from './commands.js';
-import { actionSummary, lobbyMessage, setupMessage } from './presentation.js';
+import { actionSummary, lobbyMessage, setupMessage, SETUP_PAGE_COUNT } from './presentation.js';
 
 export async function publishGame(client, store, game) {
   const channel = await client.channels.fetch(game.channelId);
@@ -37,7 +37,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
     const button = interaction.isButton() && interaction.customId.startsWith('avalon:');
     const select = interaction.isStringSelectMenu?.() && interaction.customId.startsWith('avalon:');
     if (!slash && !button && !select) return;
-    const editorAction = select || (button && interaction.customId.split(':')[2] === 'savesetup');
+    const editorAction = select || (button && ['savesetup', 'setuppage'].includes(interaction.customId.split(':')[2]));
     try {
       if (editorAction) await interaction.deferUpdate();
       else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -45,7 +45,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
       const [, gameId, buttonAction, roleArgument] = (button || select) ? interaction.customId.split(':') : [];
       const action = slash ? interaction.options.getSubcommand() : buttonAction;
       if (action === 'help') return await interaction.editReply({ content: help, allowedMentions: { parse: [] } });
-      if (!['create', 'join', 'leave', 'setup', 'start', 'retry', 'end', 'preset', 'editrole', 'count', 'savesetup'].includes(action)) throw new GameError('Unknown Avalon action.');
+      if (!['create', 'join', 'leave', 'setup', 'start', 'retry', 'end', 'preset', 'setuppage', 'count', 'savesetup'].includes(action)) throw new GameError('Unknown Avalon action.');
       await games.run(interaction.guildId, async () => {
         let game;
         const user = { id: interaction.user.id, name: (interaction.member?.displayName || interaction.user.globalName || interaction.user.username).slice(0, 32) };
@@ -61,7 +61,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
           const openSetup = action === 'setup' && (button || !['preset', ...Object.keys(ROLE_INFO).map(r => r.toLowerCase())].some(key => interaction.options.getInteger(key) !== null));
           if (openSetup || editorAction) {
             games.host(game, user.id); games.lobby(game);
-            if (openSetup) drafts.set(game.guildId, { gameId: game.id, userId: user.id, config: structuredClone(game.config), role: null });
+            if (openSetup) drafts.set(game.guildId, { gameId: game.id, userId: user.id, config: structuredClone(game.config), page: 0 });
             const draft = drafts.get(game.guildId);
             if (!draft || draft.gameId !== game.id || draft.userId !== user.id) throw new GameError('Reopen Edit setup to start a new draft.');
             const value = interaction.values?.[0];
@@ -69,17 +69,16 @@ export function interactionHandler({ client, games, publish = game => publishGam
               if (!['5', '6', '7', '8', '9', '10', '15'].includes(value)) throw new GameError('Choose a supported preset.');
               draft.config = preset(Number(value));
             }
-            if (action === 'editrole') {
-              if (!Object.hasOwn(ROLE_INFO, value)) throw new GameError('Choose a supported role.');
-              draft.role = value;
+            if (action === 'setuppage') {
+              if (!/^\d+$/.test(roleArgument || '') || Number(roleArgument) >= SETUP_PAGE_COUNT) throw new GameError('Choose a valid setup page.');
+              draft.page = Number(roleArgument);
             }
             if (action === 'count') {
               if (!Object.hasOwn(ROLE_INFO, roleArgument) || !/^(?:[0-9]|1[0-5])$/.test(value || '')) throw new GameError('Choose a valid role count.');
               draft.config.mode = 'custom';
               draft.config.counts[roleArgument] = Number(value);
-              draft.role = roleArgument;
             }
-            if (action !== 'savesetup') return await interaction.editReply(setupMessage({ ...game, config: draft.config }, draft.role));
+            if (action !== 'savesetup') return await interaction.editReply(setupMessage({ ...game, config: draft.config }, draft.page));
             game = games.setup(game, user.id, draft.config);
             drafts.delete(game.guildId);
           }
