@@ -52,11 +52,11 @@ export function setupNotice(content) {
   };
 }
 
-// Each role uses four buttons and their row (5 components). Reserve room for
+// Each role uses three buttons and their row (4 components). Reserve room for
 // the summary, preset, save/navigation controls, and a validation error.
 export function setupPages() {
   const roles = Object.keys(ROLE_INFO);
-  const pageSize = 6;
+  const pageSize = 8;
   return Array.from({ length: Math.ceil(roles.length / pageSize) }, (_, i) => roles.slice(i * pageSize, (i + 1) * pageSize));
 }
 
@@ -77,11 +77,9 @@ export function setupMessage(game, error = null, page = 0) {
     const quantity = game.config.counts[role];
     rows.push(new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`avalon:${game.id}:rolelabel:${role}`)
-        .setLabel(role).setStyle(ButtonStyle.Secondary).setDisabled(true),
+        .setLabel(`${role}: ${quantity}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
       new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:-1`)
         .setLabel('−').setStyle(ButtonStyle.Primary).setDisabled(quantity === 0),
-      new ButtonBuilder().setCustomId(`avalon:${game.id}:quantity:${role}`)
-        .setLabel(String(quantity)).setStyle(ButtonStyle.Secondary).setDisabled(true),
       new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:1`)
         .setLabel('+').setStyle(ButtonStyle.Primary).setDisabled(quantity === 15),
     ));

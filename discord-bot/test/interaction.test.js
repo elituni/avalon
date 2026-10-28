@@ -193,7 +193,7 @@ test('leader announcement mentions only the leader and persists across subsequen
   assert.match(JSON.stringify(lobbyMessage(game)), /Leader/);
 });
 
-test('setup pages contain labeled minus/quantity/plus rows within the V2 limit', async () => {
+test('setup pages contain combined role/count labels with minus/plus buttons within the V2 limit', async () => {
   const { games, handler } = fixture();
   await handler(interaction('create'));
   const game = games.requireGame('guild');
@@ -209,14 +209,12 @@ test('setup pages contain labeled minus/quantity/plus rows within the V2 limit',
     assert.ok(count(components) <= 40);
     for (const row of components) {
       if (!row.components?.[0].custom_id.includes(':rolelabel:')) continue;
-      const [label, minus, quantity, plus] = row.components;
+      const [label, minus, plus] = row.components;
       const role = label.custom_id.split(':')[3];
       seen.push(role);
-      assert.equal(row.components.length, 4);
-      assert.equal(label.label, role);
+      assert.equal(row.components.length, 3);
+      assert.equal(label.label, `${role}: ${game.config.counts[role]}`);
       assert.equal(label.disabled, true);
-      assert.equal(quantity.label, String(game.config.counts[role]));
-      assert.equal(quantity.disabled, true);
       assert.equal(minus.label, '−');
       assert.equal(plus.label, '+');
       assert.equal(minus.disabled, game.config.counts[role] === 0);
@@ -371,23 +369,23 @@ test('plus/minus buttons update drafts, enforce bounds and ownership, and save a
   const unknown = await click('adjust:Unknown:1');
   assert.match(unknown.components[1].data.content, /valid role adjustment/);
   await click('setuppage:1');
-  const belowZero = await click('adjust:Spy:-1');
+  const belowZero = await click('adjust:Oberon:-1');
   assert.match(belowZero.components[1].data.content, /between 0 and 15/);
   let maximum;
-  for (let i = 0; i < 15; i++) maximum = await click('adjust:Spy:1');
-  const spyRow = maximum.components.map(c => c.toJSON()).find(c => c.components?.[0].label === 'Spy');
-  assert.equal(spyRow.components[3].disabled, true);
-  assert.equal(spyRow.components[2].label, '15');
-  const aboveMax = await click('adjust:Spy:1');
+  for (let i = 0; i < 15; i++) maximum = await click('adjust:Oberon:1');
+  const roleRow = maximum.components.map(c => c.toJSON()).find(c => c.components?.[0].custom_id.endsWith(':rolelabel:Oberon'));
+  assert.equal(roleRow.components[2].disabled, true);
+  assert.equal(roleRow.components[0].label, 'Oberon: 15');
+  const aboveMax = await click('adjust:Oberon:1');
   assert.match(aboveMax.components[1].data.content, /between 0 and 15/);
   const failed = await click('savesetup');
   assert.match(failed.components[1].data.content, /1 and 15/);
   assert.match(failed.components[0].data.content, /Page 2/);
-  for (let i = 0; i < 14; i++) await click('adjust:Spy:-1');
+  for (let i = 0; i < 14; i++) await click('adjust:Oberon:-1');
   await click('setuppage:0');
   await click('savesetup');
   assert.equal(games.requireGame('guild').config.counts.Resistance, 3);
-  assert.equal(games.requireGame('guild').config.counts.Spy, 1);
+  assert.equal(games.requireGame('guild').config.counts.Oberon, 1);
   const stale = await click('adjust:Resistance:1');
   assert.match(stale.components[0].data.content, /Reopen/);
 });
