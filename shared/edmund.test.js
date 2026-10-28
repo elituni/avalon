@@ -24,24 +24,39 @@ test('Edmund is an optional Spy role, counted and assigned through the shared se
   assert.deepEqual(totals(config), { total: 3, Resistance: 2, Spy: 1 });
   const assigned = assignRoles(playersFor(['Resistance', 'Resistance', 'Resistance']), config);
   const edmund = assigned.find(p => p.role === 'Edmund');
-  const target = assigned.find(p => p.role === 'Resistance');
-  assert.equal(edmund.edmundTargetId, target.id);
+  const target = assigned.find(p => p.id === edmund.edmundTargetId);
+  assert.equal(ROLE_INFO[target.role].team, 'Resistance');
   assert.equal(perceivedRole(edmund), 'Edmund');
 });
 
-test('Edmund draws only non-Merlin Resistance roles, including Fool and lovers', () => {
-  for (const eligibleRole of ['Resistance', 'Fool', 'Percival', 'Tristan', 'Isolde']) {
-    const players = playersFor(['Edmund', 'Merlin', 'Merlin', 'Spy', 'Mordred', 'Oberon', eligibleRole]);
+test('Edmund can draw every Resistance role, including Merlin, but never an evil role', () => {
+  for (const eligibleRole of Object.keys(ROLE_INFO).filter(role => ROLE_INFO[role].team === 'Resistance')) {
+    const players = playersFor(['Edmund', 'Assassin', 'Morgana', 'Spy', 'Mordred', 'Oberon', eligibleRole]);
     assignFoolKnowledge(players);
     assert.equal(players[0].edmundTargetId, '6');
     assert.equal(players[6].role, eligibleRole);
     for (const merlin of players.filter(p => p.role === 'Merlin')) {
-      assert.deepEqual(seen(merlin, players), ['0', '3', '5', '6']);
+      assert.deepEqual(seen(merlin, players), ['0', '1', '2', '3', '5', '6']);
     }
   }
   const players = playersFor(['Edmund', 'Merlin', 'Spy', 'Resistance', 'Percival']);
   assignEdmundKnowledge(players);
-  assert.ok(['3', '4'].includes(players[0].edmundTargetId));
+  assert.ok(['1', '3', '4'].includes(players[0].edmundTargetId));
+});
+
+test('a saved Merlin frame reveals Merlin to themself and other Merlins, including in Discord DMs', () => {
+  const players = playersFor(['Edmund', 'Merlin', 'Merlin', 'Mordred', 'Percival']);
+  assignEdmundKnowledge(players);
+  players[0].edmundTargetId = '1';
+  const restored = JSON.parse(JSON.stringify(players));
+  for (const merlin of restored.filter(p => p.role === 'Merlin')) {
+    assert.deepEqual(seen(merlin, restored), ['0', '1']);
+  }
+  assert.deepEqual(startingInformation(restored[0], restored).framedPlayer, { id: '1', name: 'Player 1' });
+  assert.deepEqual(seen(restored[4], restored), ['1', '2']);
+  assert.equal(restored[1].role, 'Merlin');
+  assert.match(roleMessage({ players: restored }, restored[1]), /Player 1/);
+  assert.deepEqual(restored, players);
 });
 
 test('only Merlin gains the actual framed player; the Edmund knows the target, not their exact role', () => {
@@ -68,24 +83,23 @@ test('only Merlin gains the actual framed player; the Edmund knows the target, n
 });
 
 test('multiple Edmunds draw independently and duplicate targets appear once in public seat order', () => {
-  const players = playersFor(['Resistance', 'Edmund', 'Merlin', 'Edmund', 'Mordred']);
+  const players = playersFor(['Merlin', 'Edmund', 'Spy', 'Edmund', 'Mordred']);
   assignEdmundKnowledge(players);
   assert.equal(players[1].edmundTargetId, '0');
   assert.equal(players[3].edmundTargetId, '0');
-  assert.deepEqual(seen(players[2], players), ['0', '1', '3']);
+  assert.deepEqual(seen(players[0], players), ['0', '1', '2', '3']);
   assert.deepEqual(startingInformation(players[1], players).framedPlayer, { id: '0', name: 'Player 0' });
   assert.deepEqual(startingInformation(players[3], players).framedPlayer, { id: '0', name: 'Player 0' });
 });
 
-test('no eligible target means no frame, including all-evil and Merlin-only good setups', () => {
-  for (const roles of [['Edmund'], ['Edmund', 'Spy'], ['Edmund', 'Merlin', 'Mordred']]) {
+test('no good player means no frame in all-evil setups', () => {
+  for (const roles of [['Edmund'], ['Edmund', 'Spy'], ['Edmund', 'Mordred']]) {
     const players = playersFor(roles);
     assignFoolKnowledge(players);
     assert.equal(players[0].edmundTargetId, null);
     const info = startingInformation(players[0], players);
     assert.equal(info.framedPlayer, null);
-    assert.match(info.explanation, /No eligible/);
-    if (roles.includes('Merlin')) assert.deepEqual(seen(players[1], players), ['0']);
+    assert.match(info.explanation, /No Resistance player/);
   }
 });
 
@@ -141,7 +155,7 @@ test('redealing clears stale private fields, and the existing post-swap hook fin
   assignFoolKnowledge(original);
   const redealt = assignRoles(original, { mode: 'custom', counts: { ...emptyCounts(), Resistance: 3 } });
   assert.ok(redealt.every(p => !Object.hasOwn(p, 'edmundTargetId') && !Object.hasOwn(p, 'foolSeenIds')));
-  const swapped = playersFor(['Edmund', 'Merlin', 'Resistance']);
+  const swapped = playersFor(['Edmund', 'Spy', 'Merlin']);
   assignFoolKnowledge(swapped);
   assert.equal(swapped[0].edmundTargetId, '2');
   [swapped[1].role, swapped[2].role] = [swapped[2].role, swapped[1].role];
@@ -152,7 +166,7 @@ test('redealing clears stale private fields, and the existing post-swap hook fin
 test('missing or invalid saved Edmund data fails instead of inventing starting knowledge', () => {
   const players = playersFor(['Edmund', 'Merlin', 'Resistance']);
   assert.throws(() => startingInformation(players[1], players), /Missing saved Edmund/);
-  players[0].edmundTargetId = '1';
+  players[0].edmundTargetId = '0';
   assert.throws(() => startingInformation(players[1], players), /Invalid saved Edmund/);
   players[0].edmundTargetId = 'missing';
   assert.throws(() => startingInformation(players[0], players), /Invalid saved Edmund/);
@@ -226,7 +240,6 @@ test('unchanged web API reveals frames privately, preserves reconnects and suppo
   const edmund = all.find(p => p.role === 'Edmund');
   const target = all.find(p => p.id === edmund.information.framedPlayer.id);
   assert.equal(target.team, 'Resistance');
-  assert.notEqual(target.role, 'Merlin');
   const merlin = all.find(p => p.role === 'Merlin');
   const expectedIds = all.filter(p => ['Edmund', 'Morgana'].includes(p.role) || p.id === target.id).map(p => p.id);
   assert.deepEqual(merlin.information.players.map(p => p.id), expectedIds);

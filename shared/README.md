@@ -7,17 +7,19 @@ for the change are in `shared/`; commands, game phases, and clients are unchange
 ## Edmund
 
 At role assignment, each Edmund randomly frames one player whose actual team is
-Resistance and whose actual role is not Merlin. Eligible roles are Resistance,
-Fool, Percival, Tristan, and Isolde. A Fool is eligible because its actual role is
-Fool, even though it believes it is Merlin. The Edmund cannot frame itself or any
-other evil player. If no eligible player exists in a custom setup, its target is
+Resistance, with no restriction on their role. Eligible roles are Resistance,
+Merlin, Fool, Percival, Tristan, and Isolde. Each good player has an equal chance
+of being selected. The Edmund cannot frame itself or any other evil player.
+If no good player exists in a custom setup, its target is
 `null` and no player is framed.
 
 Each Edmund chooses independently, so multiple Edmunds may frame the same person.
 Every real Merlin sees the union of normally visible spies and framed players,
-without duplicates and in public seat order. The framed player remains on the
-Resistance team, retains their actual role and knowledge, and is not told about
-the frame. Mordred stays hidden. Edmund itself is visible to Merlin and to other
+without duplicates and in public seat order. A framed Merlin sees themself in
+that list, and other Merlins also see them as evil. The framed player remains on
+the Resistance team and retains their actual role and knowledge. There is no
+separate notification to the target; a framed Merlin can infer the frame from
+their own appearance in the list. Mordred stays hidden. Edmund itself is visible to Merlin and to other
 spies under the normal teammate rules; Oberon remains hidden from its teammates.
 
 An Edmund sees its real spy teammates in `information.players`. Its own framed
@@ -89,14 +91,14 @@ npm test
 
 The shared test file must be run explicitly because the root test command only
 discovers tests under `web/test/` and `discord-bot/test/`. The shared tests cover
-eligible and ineligible targets, multiple Edmunds and Merlins, no-target setups,
+eligible and ineligible targets, Merlin seeing themself when framed, multiple Edmunds and Merlins, no-target setups,
 Fool counts and self exclusion, role privacy, stable reads, redeals, the demo's
 post-swap hook, actual Discord game delivery with a temporary state file and fake
 DMs, and the unchanged web API's privacy, reconnect, and reset behavior. The web
 test opens a temporary localhost port. No real Discord messages are sent.
 
 Local validation against upstream `main` at `3fb9303`, using Node.js 24.22.1:
-all **69 tests pass** (12 shared tests and 57 tests in the root suite).
+all **70 tests pass** (13 shared tests and 57 tests in the root suite).
 `git diff --check` passes. All four local changed/added files are under `shared/`.
 
 ### Discord setup editor

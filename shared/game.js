@@ -49,7 +49,7 @@ export function startingInformation(me, players) {
       // use that list to mark spies. Seat and ID identify the frame in both clients.
       explanation += target
         ? ` You framed the player in seat ${players.findIndex(p => p.id === target.id) + 1} (ID: ${target.id}). They remain Resistance but appear as a spy to Merlin. They are not a spy teammate.`
-        : ' No eligible non-Merlin Resistance player exists, so you framed nobody.';
+        : ' No Resistance player exists, so you framed nobody.';
       return { heading, explanation, players: visible.map(p => ({ id: p.id, name: p.name })),
         framedPlayer: target ? { id: target.id, name: target.name } : null };
     }
@@ -62,7 +62,7 @@ function framedPlayer(edmund, players) {
   if (!Object.hasOwn(edmund, 'edmundTargetId')) throw new Error('Missing saved Edmund information.');
   if (edmund.edmundTargetId === null) return null;
   const target = players.find(p => p.id === edmund.edmundTargetId);
-  if (!target || target.role === 'Merlin' || ROLE_INFO[target.role]?.team !== 'Resistance') {
+  if (!target || ROLE_INFO[target.role]?.team !== 'Resistance') {
     throw new Error('Invalid saved Edmund target.');
   }
   return target;
@@ -106,8 +106,9 @@ export function randomPlayerIds(players, excludedId, count) {
 
 // Draw once, after roles are final. Each Edmund draws independently; multiple
 // Edmunds may frame the same player. No eligible player means no frame (null).
+// Any Resistance role is eligible, including Merlin (who then sees themself).
 export function assignEdmundKnowledge(players) {
-  const candidates = players.filter(p => p.role !== 'Merlin' && ROLE_INFO[p.role].team === 'Resistance');
+  const candidates = players.filter(p => ROLE_INFO[p.role].team === 'Resistance');
   for (const player of players) {
     delete player.edmundTargetId;
     if (player.role === 'Edmund') {

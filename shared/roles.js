@@ -11,7 +11,7 @@ export const ROLE_INFO = {
   Morgana: { team: 'Spy', description: 'Knows spies except Oberon. Appears as Merlin to Percival.' },
   Mordred: { team: 'Spy', description: 'Knows spies except Oberon. Hidden from Merlin.' },
   Oberon: { team: 'Spy', description: 'Unknown to other spies; knows none. Visible to Merlin.' },
-  Edmund: { team: 'Spy', description: 'Knows spies except Oberon. A random non-Merlin Resistance player appears as evil to Merlin. Knows the framed player.' },
+  Edmund: { team: 'Spy', description: 'Knows spies except Oberon. A random Resistance player, including Merlin, appears as evil to Merlin. A framed Merlin sees themself as evil. Knows the framed player.' },
 };
 export const SPY_COUNTS = { 5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4 };
 export const emptyCounts = () => Object.fromEntries(Object.keys(ROLE_INFO).map(role => [role, 0]));
