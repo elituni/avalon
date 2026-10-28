@@ -1,8 +1,9 @@
 # Shared role rules
 
 This folder is the common rules API for the website and Discord bot. This change
-adds **Edmund**, an optional evil (`Spy`) role. All code, tests, and documentation
-for the change are in `shared/`; commands, game phases, and clients are unchanged.
+adds **Edmund**, an optional evil (`Spy`) role. Role logic and role tests live in `shared/`. Discord storage migrations preserve
+existing setups, and both deployment test commands include the shared tests.
+Commands and game phases are unchanged.
 
 ## Edmund
 
@@ -73,11 +74,12 @@ receive the same explanation as real Merlin, and remain invisible to Percival.
   Merlin list. A saved `null` target explicitly represents no eligible player.
 - The existing Discord store already persists full player objects before any DMs.
   The new target IDs and Fool lists therefore survive delivery failures, restarts,
-  and retries without changes outside this folder. The web server retains them
+  and retries without changing the delivery flow. The web server retains them
   through reconnects; its existing in-memory games still clear on server restart.
 - Previously started games without Edmunds retain their assignments and saved Fool
-  lists. A legacy Discord lobby saved before this role was added lacks the Edmund
-  count required by setup validation; apply a fresh preset or recreate that lobby.
+  lists. On load, saved Discord setups gain a zero count for any newly introduced
+  role, including Edmund. Existing counts, creation times, assignments, and DM
+  delivery progress are preserved; no preset reset or lobby recreation is needed.
 
 ## Validation
 
@@ -85,21 +87,20 @@ Use Node.js 22.12+ and install the existing locked bot dependencies:
 
 ```sh
 npm --prefix discord-bot ci
-node --test shared/*.test.js
 npm test
 ```
 
-The shared test file must be run explicitly because the root test command only
-discovers tests under `web/test/` and `discord-bot/test/`. The shared tests cover
+The root test command includes `shared/*.test.js`, as does `npm --prefix web test`.
+Both bot and website deployments therefore run the Edmund regression tests.
+The shared tests cover
 eligible and ineligible targets, Merlin seeing themself when framed, multiple Edmunds and Merlins, no-target setups,
 Fool counts and self exclusion, role privacy, stable reads, redeals, the demo's
 post-swap hook, actual Discord game delivery with a temporary state file and fake
 DMs, and the unchanged web API's privacy, reconnect, and reset behavior. The web
 test opens a temporary localhost port. No real Discord messages are sent.
 
-Local validation against upstream `main` at `3fb9303`, using Node.js 24.22.1:
-all **70 tests pass** (13 shared tests and 57 tests in the root suite).
-`git diff --check` passes. All four local changed/added files are under `shared/`.
+The bot tests also cover opening, editing, and starting a saved pre-Edmund lobby,
+and preserving assignments and delivery state for games already started.
 
 ### Discord setup editor
 
@@ -109,5 +110,5 @@ page of the twelve-role catalog. Use
 **Next** and **Previous** to navigate, and **Save setup** to apply edits from all
 pages. Every page stays within Discord's 40-component limit, including validation
 errors. The upstream tests cover page limits, all role labels, navigation, draft
-preservation, and saving across pages. No additional bot changes are needed for
+preservation, and saving across pages. No additional setup UI changes are needed for
 Edmund; the website also generates its setup inputs from the shared role catalog.
