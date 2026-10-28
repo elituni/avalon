@@ -208,8 +208,8 @@ test('setup pages contain combined role/count labels with minus/plus buttons wit
     const count = items => items.reduce((n, c) => n + 1 + count(c.components || []), 0);
     assert.ok(count(components) <= 40);
     for (const row of components) {
-      if (!row.components?.[0].custom_id.includes(':rolelabel:')) continue;
-      const [label, minus, plus] = row.components;
+      if (!row.components?.[2]?.custom_id.includes(':rolelabel:')) continue;
+      const [minus, plus, label] = row.components;
       const role = label.custom_id.split(':')[3];
       seen.push(role);
       assert.equal(row.components.length, 3);
@@ -373,9 +373,9 @@ test('plus/minus buttons update drafts, enforce bounds and ownership, and save a
   assert.match(belowZero.components[1].data.content, /between 0 and 15/);
   let maximum;
   for (let i = 0; i < 15; i++) maximum = await click('adjust:Oberon:1');
-  const roleRow = maximum.components.map(c => c.toJSON()).find(c => c.components?.[0].custom_id.endsWith(':rolelabel:Oberon'));
-  assert.equal(roleRow.components[2].disabled, true);
-  assert.equal(roleRow.components[0].label, 'Oberon: 15');
+  const roleRow = maximum.components.map(c => c.toJSON()).find(c => c.components?.[2]?.custom_id.endsWith(':rolelabel:Oberon'));
+  assert.equal(roleRow.components[1].disabled, true);
+  assert.equal(roleRow.components[2].label, 'Oberon: 15');
   const aboveMax = await click('adjust:Oberon:1');
   assert.match(aboveMax.components[1].data.content, /between 0 and 15/);
   const failed = await click('savesetup');

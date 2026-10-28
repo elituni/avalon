@@ -76,12 +76,12 @@ export function setupMessage(game, error = null, page = 0) {
   for (const role of pages[page]) {
     const quantity = game.config.counts[role];
     rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`avalon:${game.id}:rolelabel:${role}`)
-        .setLabel(`${role}: ${quantity}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
       new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:-1`)
         .setLabel('−').setStyle(ButtonStyle.Primary).setDisabled(quantity === 0),
       new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:1`)
         .setLabel('+').setStyle(ButtonStyle.Primary).setDisabled(quantity === 15),
+      new ButtonBuilder().setCustomId(`avalon:${game.id}:rolelabel:${role}`)
+        .setLabel(`${role}: ${quantity}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
     ));
   }
   const controls = new ActionRowBuilder();
