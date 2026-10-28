@@ -37,17 +37,17 @@ export function interactionHandler({ client, games, publish = game => publishGam
     const button = interaction.isButton() && interaction.customId.startsWith('avalon:');
     const select = interaction.isStringSelectMenu?.() && interaction.customId.startsWith('avalon:');
     if (!slash && !button && !select) return;
-    const editorAction = select || (button && ['savesetup', 'setuppage'].includes(interaction.customId.split(':')[2]));
+    const editorAction = select || (button && ['savesetup', 'setuppage', 'adjust'].includes(interaction.customId.split(':')[2]));
     try {
       if (editorAction) await interaction.deferUpdate();
       else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       if (!interaction.guildId) throw new GameError('Use Avalon in a server text channel.');
-      const [, gameId, buttonAction, roleArgument] = (button || select) ? interaction.customId.split(':') : [];
+      const [, gameId, buttonAction, roleArgument, adjustment] = (button || select) ? interaction.customId.split(':') : [];
       const action = slash ? interaction.options.getSubcommand() : buttonAction;
       if (slash && action === 'setup') throw new GameError('Use the lobby’s Edit setup button to configure roles.');
       if (slash && action === 'roles') return await interaction.editReply({ content: roles, allowedMentions: { parse: [] } });
       if (action === 'help') return await interaction.editReply({ content: help, allowedMentions: { parse: [] } });
-      if (!['create', 'join', 'leave', 'setup', 'start', 'retry', 'end', 'preset', 'setuppage', 'count', 'savesetup'].includes(action)) throw new GameError('Unknown Avalon action.');
+      if (!['create', 'join', 'leave', 'setup', 'start', 'retry', 'end', 'preset', 'setuppage', 'count', 'adjust', 'savesetup'].includes(action)) throw new GameError('Unknown Avalon action.');
       await games.run(interaction.guildId, async () => {
         let game;
         const user = { id: interaction.user.id, name: (interaction.member?.displayName || interaction.user.globalName || interaction.user.username).slice(0, 32) };
@@ -76,6 +76,14 @@ export function interactionHandler({ client, games, publish = game => publishGam
               if (!['5', '6', '7', '8', '9', '10', '15'].includes(value)) throw new GameError('Choose a supported preset.');
               draft.config = preset(Number(value));
             }
+            if (action === 'adjust') {
+              if (!Object.hasOwn(ROLE_INFO, roleArgument) || !['-1', '1'].includes(adjustment)) throw new GameError('Choose a valid role adjustment.');
+              const quantity = draft.config.counts[roleArgument] + Number(adjustment);
+              if (!Number.isInteger(quantity) || quantity < 0 || quantity > 15) throw new GameError('Role counts must stay between 0 and 15.');
+              draft.config.mode = 'custom';
+              draft.config.counts[roleArgument] = quantity;
+            }
+            // Keep existing dropdown messages usable until their draft is closed.
             if (action === 'count') {
               if (!Object.hasOwn(ROLE_INFO, roleArgument) || !/^(?:[0-9]|1[0-5])$/.test(value || '')) throw new GameError('Choose a valid role count.');
               draft.config.mode = 'custom';

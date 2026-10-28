@@ -193,7 +193,7 @@ test('leader announcement mentions only the leader and persists across subsequen
   assert.match(JSON.stringify(lobbyMessage(game)), /Leader/);
 });
 
-test('setup pages contain every labeled numeric menu within the V2 limit', async () => {
+test('setup pages contain labeled minus/quantity/plus rows within the V2 limit', async () => {
   const { games, handler } = fixture();
   await handler(interaction('create'));
   const game = games.requireGame('guild');
@@ -207,16 +207,20 @@ test('setup pages contain every labeled numeric menu within the V2 limit', async
     const components = view.components.map(c => c.toJSON());
     const count = items => items.reduce((n, c) => n + 1 + count(c.components || []), 0);
     assert.ok(count(components) <= 40);
-    for (let i = 0; i < components.length; i++) {
-      for (const component of components[i].components || []) {
-        if (!component.custom_id.includes(':count:')) continue;
-        const role = component.custom_id.split(':')[3];
-        seen.push(role);
-        assert.equal(components[i - 1].content, `**${role}**`);
-        assert.equal(component.options.length, 16);
-        assert.equal(component.options.find(option => option.default).value, String(game.config.counts[role]));
-        assert.ok(component.options.every(option => /^\d+$/.test(option.label)));
-      }
+    for (const row of components) {
+      if (!row.components?.[0].custom_id.includes(':rolelabel:')) continue;
+      const [label, minus, quantity, plus] = row.components;
+      const role = label.custom_id.split(':')[3];
+      seen.push(role);
+      assert.equal(row.components.length, 4);
+      assert.equal(label.label, role);
+      assert.equal(label.disabled, true);
+      assert.equal(quantity.label, String(game.config.counts[role]));
+      assert.equal(quantity.disabled, true);
+      assert.equal(minus.label, '−');
+      assert.equal(plus.label, '+');
+      assert.equal(minus.disabled, game.config.counts[role] === 0);
+      assert.equal(plus.disabled, game.config.counts[role] === 15);
     }
   }
   assert.deepEqual(seen.sort(), Object.keys(game.config.counts).sort());
@@ -291,7 +295,7 @@ test('larger role catalogs fit every page, including validation errors', async t
         const controls = components.at(-1).components;
         assert.equal(controls[0].disabled, page === 0);
         assert.equal(controls[1].disabled, page === setupPages().length - 1);
-        const menus = components.flatMap(c => c.components || []).filter(c => c.custom_id.includes(':count:'));
+        const menus = components.flatMap(c => c.components || []).filter(c => c.custom_id.includes(':rolelabel:'));
         if (!error) seen.push(...menus.map(c => c.custom_id.split(':')[3]));
       }
     }
@@ -321,7 +325,7 @@ test('extra role edits survive navigation, invalid saves, and preset changes', a
   const page = await edit('setuppage:1');
   assert.match(page.components[0].data.content, /Page 2 of 2/);
   assert.match(page.components[0].data.content, /Resistance: \*\*3\*\*/);
-  assert.ok(JSON.stringify(page).includes(':count:ExtraRole'));
+  assert.ok(JSON.stringify(page).includes(':rolelabel:ExtraRole'));
   await edit('count:ExtraRole', '15');
   const failed = await edit('savesetup');
   assert.match(failed.components[1].data.content, /1 and 15/);
@@ -341,4 +345,49 @@ test('extra role edits survive navigation, invalid saves, and preset changes', a
   await edit('savesetup');
   assert.equal(games.requireGame('guild').config.counts.ExtraRole, 1);
   assert.equal(games.requireGame('guild').config.counts.Resistance, 3);
+});
+
+test('plus/minus buttons update drafts, enforce bounds and ownership, and save across pages', async () => {
+  const { games, handler } = fixture();
+  await handler(interaction('create'));
+  const game = games.requireGame('guild');
+  await handler(interaction('setup', { gameId: game.id }));
+  async function click(action, userId = 'host') {
+    const request = interaction(action, { gameId: game.id, userId, messageId: 'private-editor' });
+    request.deferUpdate = async () => { request.deferred = true; request.updated = true; };
+    await handler(request);
+    assert.equal(request.updated, true);
+    return request.response;
+  }
+  const denied = await click('adjust:Resistance:1', 'guest');
+  assert.match(denied.components[0].data.content, /Only the host/);
+  await click('adjust:Resistance:1');
+  const adjusted = await click('adjust:Resistance:1');
+  assert.match(adjusted.components[0].data.content, /Resistance: \*\*4\*\*/);
+  assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
+  await click('adjust:Resistance:-1');
+  const invalid = await click('adjust:Resistance:15');
+  assert.match(invalid.components[1].data.content, /valid role adjustment/);
+  const unknown = await click('adjust:Unknown:1');
+  assert.match(unknown.components[1].data.content, /valid role adjustment/);
+  await click('setuppage:1');
+  const belowZero = await click('adjust:Spy:-1');
+  assert.match(belowZero.components[1].data.content, /between 0 and 15/);
+  let maximum;
+  for (let i = 0; i < 15; i++) maximum = await click('adjust:Spy:1');
+  const spyRow = maximum.components.map(c => c.toJSON()).find(c => c.components?.[0].label === 'Spy');
+  assert.equal(spyRow.components[3].disabled, true);
+  assert.equal(spyRow.components[2].label, '15');
+  const aboveMax = await click('adjust:Spy:1');
+  assert.match(aboveMax.components[1].data.content, /between 0 and 15/);
+  const failed = await click('savesetup');
+  assert.match(failed.components[1].data.content, /1 and 15/);
+  assert.match(failed.components[0].data.content, /Page 2/);
+  for (let i = 0; i < 14; i++) await click('adjust:Spy:-1');
+  await click('setuppage:0');
+  await click('savesetup');
+  assert.equal(games.requireGame('guild').config.counts.Resistance, 3);
+  assert.equal(games.requireGame('guild').config.counts.Spy, 1);
+  const stale = await click('adjust:Resistance:1');
+  assert.match(stale.components[0].data.content, /Reopen/);
 });

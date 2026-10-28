@@ -52,11 +52,11 @@ export function setupNotice(content) {
   };
 }
 
-// Each role uses a label, row, and select (3 components). Reserve room for
+// Each role uses four buttons and their row (5 components). Reserve room for
 // the summary, preset, save/navigation controls, and a validation error.
 export function setupPages() {
   const roles = Object.keys(ROLE_INFO);
-  const pageSize = roles.length <= 11 ? 11 : 10;
+  const pageSize = 6;
   return Array.from({ length: Math.ceil(roles.length / pageSize) }, (_, i) => roles.slice(i * pageSize, (i + 1) * pageSize));
 }
 
@@ -74,12 +74,17 @@ export function setupMessage(game, error = null, page = 0) {
     .setCustomId(`avalon:${game.id}:preset`).setPlaceholder('Choose a player-count preset')
     .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) })))));
   for (const role of pages[page]) {
-    rows.push(new TextDisplayBuilder().setContent(`**${role}**`));
-    rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
-      .setCustomId(`avalon:${game.id}:count:${role}`).setPlaceholder(String(game.config.counts[role]))
-      .addOptions(...Array.from({ length: 16 }, (_, n) => ({
-        label: String(n), value: String(n), default: n === game.config.counts[role],
-      })))));
+    const quantity = game.config.counts[role];
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`avalon:${game.id}:rolelabel:${role}`)
+        .setLabel(role).setStyle(ButtonStyle.Secondary).setDisabled(true),
+      new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:-1`)
+        .setLabel('−').setStyle(ButtonStyle.Primary).setDisabled(quantity === 0),
+      new ButtonBuilder().setCustomId(`avalon:${game.id}:quantity:${role}`)
+        .setLabel(String(quantity)).setStyle(ButtonStyle.Secondary).setDisabled(true),
+      new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:1`)
+        .setLabel('+').setStyle(ButtonStyle.Primary).setDisabled(quantity === 15),
+    ));
   }
   const controls = new ActionRowBuilder();
   if (pages.length > 1) controls.addComponents(
