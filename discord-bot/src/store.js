@@ -14,16 +14,21 @@ export class GameStore {
         throw new Error('Unsupported bot state file.');
       }
       this.games = saved.games;
+      let migrated = false;
       // Saved games from before Fool was introduced keep all assignments intact.
       for (const game of Object.values(this.games)) {
-        if (game.config?.counts && !Object.hasOwn(game.config.counts, 'Fool')) game.config.counts.Fool = 0;
+        if (game.config?.counts && !Object.hasOwn(game.config.counts, 'Fool')) {
+          game.config.counts.Fool = 0;
+          migrated = true;
+        }
         // Old games lack creation times: use their start time if known,
         // otherwise start a one-minute grace period and persist it once.
         if (!Number.isFinite(game.createdAt)) {
           game.createdAt = Number.isFinite(game.startedAt) ? game.startedAt : Date.now();
-          this.set(game.guildId, game);
+          migrated = true;
         }
       }
+      if (migrated) this.persist(this.games);
       chmodSync(file, 0o600);
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
@@ -32,9 +37,14 @@ export class GameStore {
   get(guildId) { return structuredClone(this.games[guildId] ?? null); }
   all() { return structuredClone(Object.values(this.games)); }
   set(guildId, game) {
-    const next = structuredClone(this.games);
+    // Stored records are isolated at the read/write boundaries; only the
+    // changed game needs a deep copy, not every other server’s game.
+    const next = { ...this.games };
     if (game) next[guildId] = structuredClone(game);
     else delete next[guildId];
+    this.persist(next);
+  }
+  persist(next) {
     if (this.file) {
       mkdirSync(dirname(this.file), { recursive: true, mode: 0o700 });
       const temporary = `${this.file}.tmp`;

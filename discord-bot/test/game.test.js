@@ -250,3 +250,47 @@ test('legacy creation timers are migrated once and persist across restarts', asy
   writeFileSync(f.file, JSON.stringify(legacy));
   assert.equal(new GameStore(f.file).get('guild').createdAt, legacy.games.guild.startedAt);
 });
+
+test('store isolates input and output objects and keeps state intact on a failed write', t => {
+  const f = fixture(t, { disk: true });
+  const game = { guildId: 'a', createdAt: 1, config: preset(), players: [{ id: '1', name: 'Original' }] };
+  f.store.set('a', game);
+  f.store.set('b', { ...game, guildId: 'b' });
+  game.players[0].name = 'Input changed';
+  f.store.get('a').players[0].name = 'Read changed';
+  f.store.all()[0].config.counts.Merlin = 9;
+  const before = f.store.all();
+  assert.equal(before[0].players[0].name, 'Original');
+  assert.equal(before[0].config.counts.Merlin, 1);
+  // A regular file cannot be used as the parent directory of a state file.
+  f.store.file = join(f.file, 'invalid.json');
+  assert.throws(() => f.store.set('a', game));
+  assert.throws(() => f.store.set('b', null));
+  assert.deepEqual(f.store.all(), before);
+  f.store.file = f.file;
+  assert.deepEqual(new GameStore(f.file).all(), before);
+  f.store.set('a', { ...game, players: [] });
+  assert.equal(f.store.get('b').players[0].name, 'Original');
+});
+
+test('startup migrates every saved guild in a single write and skips writes on the next load', t => {
+  const f = fixture(t, { disk: true });
+  const a = { guildId: 'a', config: preset(), players: [] };
+  const b = { guildId: 'b', createdAt: 123, config: preset(), players: [] };
+  delete a.config.counts.Fool;
+  delete b.config.counts.Fool;
+  writeFileSync(f.file, JSON.stringify({ version: 1, games: { a, b } }));
+  let writes = 0;
+  class CountingStore extends GameStore {
+    persist(next) { writes++; super.persist(next); }
+  }
+  const migrated = new CountingStore(f.file);
+  assert.equal(writes, 1);
+  assert.equal(migrated.get('a').config.counts.Fool, 0);
+  assert.equal(migrated.get('b').config.counts.Fool, 0);
+  assert.ok(Number.isFinite(migrated.get('a').createdAt));
+  assert.equal(migrated.get('b').createdAt, 123);
+  const restored = new CountingStore(f.file);
+  assert.equal(writes, 1);
+  assert.deepEqual(restored.all(), migrated.all());
+});
