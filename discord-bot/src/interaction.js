@@ -3,7 +3,7 @@ import { ROLE_INFO, preset } from '../../shared/roles.js';
 import { ChannelType, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { GameError } from './game.js';
 import { help, roles } from './commands.js';
-import { actionSummary, lobbyMessage, setupMessage, setupNotice } from './presentation.js';
+import { actionSummary, lobbyMessage, setupMessage, setupNotice, setupPages } from './presentation.js';
 
 export async function publishGame(client, store, game) {
   const channel = await client.channels.fetch(game.channelId);
@@ -63,9 +63,14 @@ export function interactionHandler({ client, games, publish = game => publishGam
           const openSetup = action === 'setup' && button;
           if (openSetup || editorAction) {
             games.host(game, user.id); games.lobby(game);
-            if (openSetup) drafts.set(game.guildId, { gameId: game.id, userId: user.id, config: structuredClone(game.config) });
+            if (openSetup) drafts.set(game.guildId, { gameId: game.id, userId: user.id, page: 0, config: structuredClone(game.config) });
             const draft = drafts.get(game.guildId);
             if (!draft || draft.gameId !== game.id || draft.userId !== user.id) throw new GameError('Reopen Edit setup to start a new draft.');
+            if (action === 'setuppage') {
+              const page = Number(roleArgument);
+              if (!/^\d+$/.test(roleArgument || '') || !Number.isInteger(page) || page >= setupPages().length) throw new GameError('Choose an available setup page.');
+              draft.page = page;
+            }
             const value = interaction.values?.[0];
             if (action === 'preset') {
               if (!['5', '6', '7', '8', '9', '10', '15'].includes(value)) throw new GameError('Choose a supported preset.');
@@ -76,7 +81,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
               draft.config.mode = 'custom';
               draft.config.counts[roleArgument] = Number(value);
             }
-            if (action !== 'savesetup') return await interaction.editReply(setupMessage({ ...game, config: draft.config }));
+            if (action !== 'savesetup') return await interaction.editReply(setupMessage({ ...game, config: draft.config }, null, draft.page));
             game = games.setup(game, user.id, draft.config);
             drafts.delete(game.guildId);
           }
@@ -107,7 +112,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
             const game = games.store.get(interaction.guildId);
             payload = game?.phase === 'lobby' && game.hostId === interaction.user.id &&
               draft?.gameId === game.id && draft.userId === interaction.user.id
-              ? setupMessage({ ...game, config: draft.config }, content) : setupNotice(content);
+              ? setupMessage({ ...game, config: draft.config }, content, draft.page) : setupNotice(content);
           }
           await interaction.editReply(payload);
         }

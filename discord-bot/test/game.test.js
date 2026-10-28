@@ -202,36 +202,51 @@ test('legacy saved games gain a zero Fool count without changing assignments or 
   assert.deepEqual(restored.delivered, game.delivered);
 });
 
-test('any server member can end at one minute, including after restart and retry', async t => {
+test('any server member can end a lobby at one minute, including after restart', async t => {
   const f = fixture(t, { disk: true });
   let now = 1_000_000;
   f.games.now = () => now;
-  await f.full();
-  const game = await f.act('start', '0');
-  assert.equal(game.startedAt, now);
+  await f.create();
+  assert.equal(f.store.get('guild').createdAt, now);
   now += 59_999;
-  await assert.rejects(f.act('end', '1'), /first minute/);
   await assert.rejects(f.act('end', 'non-player'), /first minute/);
-  assert.ok(f.store.get('guild'));
   const recovered = new BotGames({ store: new GameStore(f.file), sendDM: f.sendDM, now: () => now });
-  await recovered.retry(recovered.requireGame('guild'), '0');
-  assert.equal(recovered.requireGame('guild').startedAt, game.startedAt);
   now++;
-  const ended = recovered.end(recovered.requireGame('guild'), 'non-player');
-  assert.equal(ended.phase, 'ended');
+  assert.equal(recovered.end(recovered.requireGame('guild'), 'non-player').phase, 'ended');
   assert.equal(new GameStore(f.file).get('guild'), null);
 });
 
-test('host can end immediately; lobbies and legacy games remain host-only', async t => {
+test('starting and retrying do not reset the creation timer; hosts can end immediately', async t => {
   const f = fixture(t);
+  let now = 1_000_000;
+  f.games.now = () => now;
+  await f.create();
+  assert.equal((await f.act('end', '0')).phase, 'ended');
   await f.full();
-  await assert.rejects(f.act('end', 'non-player'), /Only the host/);
+  now += 60_000;
   await f.act('start', '0');
-  assert.equal((await f.act('end', '0')).phase, 'ended');
+  await f.act('retry', '0');
+  assert.equal((await f.act('end', 'non-player')).phase, 'ended');
   await f.full();
-  const game = await f.act('start', '0');
-  delete game.startedAt;
-  f.store.set('guild', game);
-  await assert.rejects(f.act('end', 'non-player'), /start time was not recorded/);
+  await f.act('start', '0');
+  await assert.rejects(f.act('end', 'non-player'), /first minute/);
   assert.equal((await f.act('end', '0')).phase, 'ended');
+});
+
+test('legacy creation timers are migrated once and persist across restarts', async t => {
+  const f = fixture(t, { disk: true });
+  await f.create();
+  const legacy = JSON.parse(readFileSync(f.file, 'utf8'));
+  delete legacy.games.guild.createdAt;
+  writeFileSync(f.file, JSON.stringify(legacy));
+  const before = Date.now();
+  const restored = new GameStore(f.file).get('guild');
+  assert.ok(restored.createdAt >= before && restored.createdAt <= Date.now());
+  assert.equal(new GameStore(f.file).get('guild').createdAt, restored.createdAt);
+  const recovered = new BotGames({ store: new GameStore(f.file), sendDM: f.sendDM, now: () => restored.createdAt + 60_000 });
+  recovered.end(recovered.requireGame('guild'), 'non-player');
+  legacy.games.guild.phase = 'started';
+  legacy.games.guild.startedAt = before - 120_000;
+  writeFileSync(f.file, JSON.stringify(legacy));
+  assert.equal(new GameStore(f.file).get('guild').createdAt, legacy.games.guild.startedAt);
 });

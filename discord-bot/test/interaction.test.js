@@ -6,7 +6,7 @@ import { GameStore } from '../src/store.js';
 import { interactionHandler, publishGame } from '../src/interaction.js';
 import { ROLE_INFO } from '../../shared/roles.js';
 import { command } from '../src/commands.js';
-import { lobbyMessage, setupMessage } from '../src/presentation.js';
+import { lobbyMessage, setupMessage, setupPages } from '../src/presentation.js';
 
 function interaction(action, { userId = 'host', gameId, messageId = 'message', channelId = 'channel', options = {} } = {}) {
   const button = Boolean(gameId);
@@ -193,29 +193,30 @@ test('leader announcement mentions only the leader and persists across subsequen
   assert.match(JSON.stringify(lobbyMessage(game)), /Leader/);
 });
 
-test('one setup message contains all labeled numeric menus within the V2 limit', async () => {
+test('setup pages contain every labeled numeric menu within the V2 limit', async () => {
   const { games, handler } = fixture();
   await handler(interaction('create'));
   const game = games.requireGame('guild');
-  const view = setupMessage(game);
-  assert.equal(view.flags, MessageFlags.IsComponentsV2);
-  assert.equal(view.content, null);
-  assert.deepEqual(view.embeds, []);
-  assert.ok(!view.components[0].data.content.includes('Tristan:'));
-  const components = view.components.map(c => c.toJSON());
-  const count = items => items.reduce((n, c) => n + 1 + count(c.components || []), 0);
-  assert.ok(count(components) <= 40);
   const seen = [];
-  for (let i = 0; i < components.length; i++) {
-    for (const component of components[i].components || []) {
-      assert.ok(!component.custom_id.includes('setuppage'));
-      if (!component.custom_id.includes(':count:')) continue;
-      const role = component.custom_id.split(':')[3];
-      seen.push(role);
-      assert.equal(components[i - 1].content, `**${role}**`);
-      assert.equal(component.options.length, 16);
-      assert.equal(component.options.find(option => option.default).value, String(game.config.counts[role]));
-      assert.ok(component.options.every(option => /^\d+$/.test(option.label)));
+  for (let page = 0; page < setupPages().length; page++) {
+    const view = setupMessage(game, null, page);
+    assert.equal(view.flags, MessageFlags.IsComponentsV2);
+    assert.equal(view.content, null);
+    assert.deepEqual(view.embeds, []);
+    assert.ok(!view.components[0].data.content.includes('Tristan:'));
+    const components = view.components.map(c => c.toJSON());
+    const count = items => items.reduce((n, c) => n + 1 + count(c.components || []), 0);
+    assert.ok(count(components) <= 40);
+    for (let i = 0; i < components.length; i++) {
+      for (const component of components[i].components || []) {
+        if (!component.custom_id.includes(':count:')) continue;
+        const role = component.custom_id.split(':')[3];
+        seen.push(role);
+        assert.equal(components[i - 1].content, `**${role}**`);
+        assert.equal(component.options.length, 16);
+        assert.equal(component.options.find(option => option.default).value, String(game.config.counts[role]));
+        assert.ok(component.options.every(option => /^\d+$/.test(option.label)));
+      }
     }
   }
   assert.deepEqual(seen.sort(), Object.keys(game.config.counts).sort());
@@ -238,7 +239,7 @@ test('V2 setup validation errors preserve editable controls and support retrying
   assert.equal(save.response.flags, MessageFlags.IsComponentsV2);
   assert.equal(save.response.content, null);
   assert.match(save.response.components[1].data.content, /1 and 15/);
-  assert.equal(save.response.components.filter(c => c.data.type === 1).length, 13);
+  assert.equal(save.response.components.filter(c => c.data.type === 1).length, setupPages()[0].length + 2);
   assert.equal(games.requireGame('guild').config.counts.Resistance, 2);
   count.values = ['2'];
   await handler(count);
@@ -269,4 +270,75 @@ test('roles is private, available without a game, and never reads or changes ass
     assert.deepEqual(games.store.all(), before);
     assert.equal(published.length, publications);
   }
+});
+
+test('larger role catalogs fit every page, including validation errors', async t => {
+  const originalRoles = Object.keys(ROLE_INFO);
+  t.after(() => {
+    for (const role of Object.keys(ROLE_INFO)) if (!originalRoles.includes(role)) delete ROLE_INFO[role];
+  });
+  const count = items => items.reduce((n, c) => n + 1 + count(c.components || []), 0);
+  for (const size of [12, 22, 35]) {
+    while (Object.keys(ROLE_INFO).length < size) ROLE_INFO[`Extra${Object.keys(ROLE_INFO).length}`] = { team: 'Resistance', description: 'Test role.' };
+    const { games, handler } = fixture();
+    await handler(interaction('create'));
+    const game = games.requireGame('guild');
+    const seen = [];
+    for (let page = 0; page < setupPages().length; page++) {
+      for (const error of [null, 'Invalid setup']) {
+        const components = setupMessage(game, error, page).components.map(c => c.toJSON());
+        assert.ok(count(components) <= 40, `${size} roles, page ${page}, error ${error}`);
+        const controls = components.at(-1).components;
+        assert.equal(controls[0].disabled, page === 0);
+        assert.equal(controls[1].disabled, page === setupPages().length - 1);
+        const menus = components.flatMap(c => c.components || []).filter(c => c.custom_id.includes(':count:'));
+        if (!error) seen.push(...menus.map(c => c.custom_id.split(':')[3]));
+      }
+    }
+    assert.deepEqual(seen, Object.keys(ROLE_INFO));
+  }
+});
+
+test('extra role edits survive navigation, invalid saves, and preset changes', async t => {
+  ROLE_INFO.ExtraRole = { team: 'Resistance', description: 'Test role.' };
+  t.after(() => { delete ROLE_INFO.ExtraRole; });
+  const { games, handler } = fixture();
+  await handler(interaction('create'));
+  const game = games.requireGame('guild');
+  await handler(interaction('setup', { gameId: game.id }));
+  async function edit(action, value, userId = 'host') {
+    const request = interaction(action, { gameId: game.id, userId });
+    if (value !== undefined) {
+      request.isButton = () => false;
+      request.isStringSelectMenu = () => true;
+      request.values = [value];
+    }
+    request.deferUpdate = async () => { request.deferred = true; };
+    await handler(request);
+    return request.response;
+  }
+  await edit('count:Resistance', '3');
+  const page = await edit('setuppage:1');
+  assert.match(page.components[0].data.content, /Page 2 of 2/);
+  assert.match(page.components[0].data.content, /Resistance: \*\*3\*\*/);
+  assert.ok(JSON.stringify(page).includes(':count:ExtraRole'));
+  await edit('count:ExtraRole', '15');
+  const failed = await edit('savesetup');
+  assert.match(failed.components[1].data.content, /1 and 15/);
+  assert.match(failed.components[0].data.content, /Page 2 of 2/);
+  assert.equal(games.requireGame('guild').config.counts.ExtraRole, 0);
+  await edit('setuppage:0');
+  const back = await edit('setuppage:1');
+  assert.match(back.components[0].data.content, /ExtraRole: \*\*15\*\*/);
+  const invalid = await edit('setuppage:999');
+  assert.match(invalid.components[1].data.content, /available setup page/);
+  const denied = await edit('setuppage:0', undefined, 'guest');
+  assert.match(denied.components[0].data.content, /Only the host/);
+  await edit('preset', '5');
+  await edit('count:ExtraRole', '1');
+  await edit('setuppage:0');
+  await edit('count:Resistance', '3');
+  await edit('savesetup');
+  assert.equal(games.requireGame('guild').config.counts.ExtraRole, 1);
+  assert.equal(games.requireGame('guild').config.counts.Resistance, 3);
 });

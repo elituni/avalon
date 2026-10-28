@@ -52,17 +52,28 @@ export function setupNotice(content) {
   };
 }
 
-export function setupMessage(game, error = null) {
+// Each role uses a label, row, and select (3 components). Reserve room for
+// the summary, preset, save/navigation controls, and a validation error.
+export function setupPages() {
+  const roles = Object.keys(ROLE_INFO);
+  const pageSize = roles.length <= 11 ? 11 : 10;
+  return Array.from({ length: Math.ceil(roles.length / pageSize) }, (_, i) => roles.slice(i * pageSize, (i + 1) * pageSize));
+}
+
+export function setupMessage(game, error = null, page = 0) {
+  const pages = setupPages();
+  page = Math.max(0, Math.min(page, pages.length - 1));
   const counts = totals(game.config);
   const summary = Object.entries(game.config.counts).filter(([, n]) => n > 0)
     .map(([role, n]) => `${role}: **${n}**`).join(' · ') || 'No roles selected.';
   const payload = setupNotice(`**Game setup** · ${counts.total} seats · ${counts.Resistance} Resistance / ${counts.Spy} Spy\n${summary}`);
   const rows = payload.components;
+  if (pages.length > 1) rows[0].setContent(`${rows[0].data.content}\nPage ${page + 1} of ${pages.length} · Save setup applies all pages.`);
   if (error) rows.push(new TextDisplayBuilder().setContent(error));
   rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
     .setCustomId(`avalon:${game.id}:preset`).setPlaceholder('Choose a player-count preset')
     .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) })))));
-  for (const role of Object.keys(ROLE_INFO)) {
+  for (const role of pages[page]) {
     rows.push(new TextDisplayBuilder().setContent(`**${role}**`));
     rows.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
       .setCustomId(`avalon:${game.id}:count:${role}`).setPlaceholder(String(game.config.counts[role]))
@@ -70,8 +81,14 @@ export function setupMessage(game, error = null) {
         label: String(n), value: String(n), default: n === game.config.counts[role],
       })))));
   }
-  rows.push(new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`avalon:${game.id}:savesetup`).setLabel('Save setup').setStyle(ButtonStyle.Success),
-  ));
+  const controls = new ActionRowBuilder();
+  if (pages.length > 1) controls.addComponents(
+    new ButtonBuilder().setCustomId(`avalon:${game.id}:setuppage:${page - 1}`)
+      .setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId(`avalon:${game.id}:setuppage:${page + 1}`)
+      .setLabel('Next').setStyle(ButtonStyle.Secondary).setDisabled(page === pages.length - 1),
+  );
+  controls.addComponents(new ButtonBuilder().setCustomId(`avalon:${game.id}:savesetup`).setLabel('Save setup').setStyle(ButtonStyle.Success));
+  rows.push(controls);
   return payload;
 }

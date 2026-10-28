@@ -17,6 +17,12 @@ export class GameStore {
       // Saved games from before Fool was introduced keep all assignments intact.
       for (const game of Object.values(this.games)) {
         if (game.config?.counts && !Object.hasOwn(game.config.counts, 'Fool')) game.config.counts.Fool = 0;
+        // Old games lack creation times: use their start time if known,
+        // otherwise start a one-minute grace period and persist it once.
+        if (!Number.isFinite(game.createdAt)) {
+          game.createdAt = Number.isFinite(game.startedAt) ? game.startedAt : Date.now();
+          this.set(game.guildId, game);
+        }
       }
       chmodSync(file, 0o600);
     } catch (error) {

@@ -53,7 +53,7 @@ export class BotGames {
   async create({ guildId, guildName, channelId, user }) {
     check(!this.store.get(guildId), 'This server already has an active game. End it before creating another.');
     const game = { id: randomUUID(), guildId, guildName, channelId, messageId: null,
-      hostId: user.id, phase: 'lobby', config: preset(), players: [{ ...user }], delivered: [] };
+      hostId: user.id, createdAt: this.now(), phase: 'lobby', config: preset(), players: [{ ...user }], delivered: [] };
     await this.checkDM(user.id, game.id);
     this.store.set(guildId, game);
     return game;
@@ -116,9 +116,8 @@ export class BotGames {
   }
   end(game, userId) {
     if (game.hostId !== userId) {
-      check(game.phase === 'started', 'Only the host can cancel a lobby.');
-      check(Number.isFinite(game.startedAt), 'Only the host can end this older game because its start time was not recorded.');
-      check(this.now() - game.startedAt >= 60_000, 'Only the host can end the game during the first minute after starting.');
+      check(Number.isFinite(game.createdAt), 'The lobby creation time is unavailable. Ask the host to end it.');
+      check(this.now() - game.createdAt >= 60_000, 'Only the host can end the game during the first minute after /avalon create.');
     }
     this.store.set(game.guildId, null);
     return { ...game, phase: 'ended' };
