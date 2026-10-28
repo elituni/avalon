@@ -52,7 +52,7 @@ export function setupNotice(content) {
   };
 }
 
-// Each role uses three buttons and their row (4 components). Reserve room for
+// Each role uses a heading, two buttons, and their row (4 components). Reserve room for
 // the summary, preset, save/navigation controls, and a validation error.
 export function setupPages() {
   const roles = Object.keys(ROLE_INFO);
@@ -75,13 +75,12 @@ export function setupMessage(game, error = null, page = 0) {
     .addOptions(...[5, 6, 7, 8, 9, 10, 15].map(n => ({ label: `${n} players`, value: String(n) })))));
   for (const role of pages[page]) {
     const quantity = game.config.counts[role];
+    rows.push(new TextDisplayBuilder().setContent(`### ${escapeMarkdown(role)}: ${quantity}`));
     rows.push(new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:-1`)
         .setLabel('−').setStyle(ButtonStyle.Primary).setDisabled(quantity === 0),
       new ButtonBuilder().setCustomId(`avalon:${game.id}:adjust:${role}:1`)
         .setLabel('+').setStyle(ButtonStyle.Primary).setDisabled(quantity === 15),
-      new ButtonBuilder().setCustomId(`avalon:${game.id}:rolelabel:${role}`)
-        .setLabel(`${role}: ${quantity}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
     ));
   }
   const controls = new ActionRowBuilder();
