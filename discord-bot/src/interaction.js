@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { ROLE_INFO, preset } from '../../shared/roles.js';
 import { ChannelType, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { GameError } from './game.js';
-import { help } from './commands.js';
+import { help, roles } from './commands.js';
 import { actionSummary, lobbyMessage, setupMessage, setupNotice } from './presentation.js';
 
 export async function publishGame(client, store, game) {
@@ -45,6 +45,7 @@ export function interactionHandler({ client, games, publish = game => publishGam
       const [, gameId, buttonAction, roleArgument] = (button || select) ? interaction.customId.split(':') : [];
       const action = slash ? interaction.options.getSubcommand() : buttonAction;
       if (slash && action === 'setup') throw new GameError('Use the lobby’s Edit setup button to configure roles.');
+      if (slash && action === 'roles') return await interaction.editReply({ content: roles, allowedMentions: { parse: [] } });
       if (action === 'help') return await interaction.editReply({ content: help, allowedMentions: { parse: [] } });
       if (!['create', 'join', 'leave', 'setup', 'start', 'retry', 'end', 'preset', 'setuppage', 'count', 'savesetup'].includes(action)) throw new GameError('Unknown Avalon action.');
       await games.run(interaction.guildId, async () => {

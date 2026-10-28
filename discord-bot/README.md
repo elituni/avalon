@@ -11,7 +11,8 @@ One active game per Discord server, in a regular text channel. The creator joins
 | `/avalon create` | Create a lobby and join as host |
 | `/avalon start` | Host: fill every seat, assign roles, DM each player's starting information |
 | `/avalon retry` | Host: retry only pending role DMs, keeping assignments |
-| `/avalon end` | Host: end the game or cancel the lobby |
+| `/avalon end` | Anyone: end the game after one minute; host: end anytime or cancel the lobby |
+| `/avalon roles` | Describe every role and its team (visible only to you; no active game needed) |
 | `/avalon help` | Show instructions |
 
 Lobby buttons: **Join**, **Leave**, **Edit setup**, **Start**. The host can open **Edit setup**, choose presets or all eleven labeled role dropdowns in one scrollable message, with numeric options, and apply the draft with **Save setup**. Drafts do not change the lobby until saved and are discarded on bot restart. If the host leaves before starting, hosting passes to the next joined player. The last player leaving closes the lobby. After starting, the roster and setup are locked. Play quests, voting, and assassination in voice or in person. Starting chooses a random first leader, shows a Leader label in the roster, and posts a message mentioning that player in the lobby channel. The choice and announcement ID persist across restarts and DM retries. Games already started before this feature retain their existing state; new games choose a leader. No optional cards are assigned.
@@ -41,6 +42,8 @@ Role DMs include the game ID, role, team, and allowed starting information. Name
 Registration updates only the global `/avalon` command, available in servers where the bot is installed. Register once, and rerun when command definitions change; adding another server does not require registration. Commands are restricted to servers, not DMs. Server administrators can restrict command access under Server Settings → Integrations. Only run one bot process against a given state file; stop the local bot before activating production.
 
 ## Persistence and tests
+
+The one-minute end timer is saved when roles are assigned and survives restarts and DM retries. Older games without a recorded start time can only be ended by the host.
 
 Games are saved atomically in `discord-bot/data/games.json` by default. Assignments are saved **before** role DMs are sent. Bot restarts preserve games, host, assignments, and delivery progress; `/avalon retry` resumes pending delivery. A crash just after a successful DM may cause that same DM to be sent again, but never reshuffles roles. The file contains private roles and is created with owner-only permissions. An unreadable or unsupported state file stops startup instead of silently resetting games.
 

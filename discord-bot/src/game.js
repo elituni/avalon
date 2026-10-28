@@ -23,9 +23,10 @@ export function roleMessage(game, player) {
 }
 
 export class BotGames {
-  constructor({ store, sendDM }) {
+  constructor({ store, sendDM, now = Date.now }) {
     this.store = store;
     this.sendDM = sendDM;
+    this.now = now;
     this.locks = new Set();
   }
   async run(guildId, action) {
@@ -91,6 +92,7 @@ export class BotGames {
     game.leaderId = chooseLeader(game.players);
     game.leaderAnnouncementId = null;
     game.phase = 'started';
+    game.startedAt = this.now();
     game.delivered = [];
     this.store.set(game.guildId, game); // Assignments must survive a crash before the first DM.
     return this.deliver(game);
@@ -113,7 +115,11 @@ export class BotGames {
     return game;
   }
   end(game, userId) {
-    this.host(game, userId);
+    if (game.hostId !== userId) {
+      check(game.phase === 'started', 'Only the host can cancel a lobby.');
+      check(Number.isFinite(game.startedAt), 'Only the host can end this older game because its start time was not recorded.');
+      check(this.now() - game.startedAt >= 60_000, 'Only the host can end the game during the first minute after starting.');
+    }
     this.store.set(game.guildId, null);
     return { ...game, phase: 'ended' };
   }

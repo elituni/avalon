@@ -4,6 +4,7 @@ import { ChannelType, MessageFlags } from 'discord.js';
 import { BotGames } from '../src/game.js';
 import { GameStore } from '../src/store.js';
 import { interactionHandler, publishGame } from '../src/interaction.js';
+import { ROLE_INFO } from '../../shared/roles.js';
 import { command } from '../src/commands.js';
 import { lobbyMessage, setupMessage } from '../src/presentation.js';
 
@@ -34,7 +35,7 @@ function fixture() {
 }
 
 test('registered commands omit setup and stale setup commands cannot change a lobby', async () => {
-  assert.deepEqual(command.toJSON().options.map(o => o.name), ['create', 'start', 'retry', 'end', 'help']);
+  assert.deepEqual(command.toJSON().options.map(o => o.name), ['create', 'start', 'retry', 'end', 'roles', 'help']);
   const { games, handler } = fixture();
   await handler(interaction('create'));
   const before = games.requireGame('guild').config;
@@ -243,4 +244,29 @@ test('V2 setup validation errors preserve editable controls and support retrying
   await handler(count);
   await handler(save);
   assert.match(save.response.components[0].data.content, /saved/);
+});
+
+
+test('roles is private, available without a game, and never reads or changes assignments', async () => {
+  const { games, published, handler } = fixture();
+  for (const started of [false, true]) {
+    if (started) {
+      await handler(interaction('create'));
+      await configureSinglePlayer(games, handler);
+      await handler(interaction('start'));
+    }
+    const before = games.store.all();
+    const publications = published.length;
+    const request = interaction('roles', { userId: 'non-player', channelId: 'another-channel' });
+    await handler(request);
+    assert.equal(request.deferPayload.flags, MessageFlags.Ephemeral);
+    assert.ok(request.response.content.length <= 2000);
+    for (const [name, info] of Object.entries(ROLE_INFO)) {
+      assert.ok(request.response.content.includes(`**${name}** · ${info.team}`));
+      assert.ok(request.response.content.includes(info.description));
+    }
+    assert.deepEqual(request.response.allowedMentions, { parse: [] });
+    assert.deepEqual(games.store.all(), before);
+    assert.equal(published.length, publications);
+  }
 });
