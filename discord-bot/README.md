@@ -22,7 +22,7 @@ Role DMs include the game ID, role, team, and allowed starting information. Name
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and create an application. Under **Bot**, obtain/reset the bot token. Keep it secret.
 2. Under **Installation**, enable **Guild Install**. Configure the `bot` and `applications.commands` scopes. Give the bot **View Channels**, **Send Messages**, **Embed Links**, and **Read Message History**. Use the installation link to add it to your server. No Administrator permission or privileged intents are needed. Leave the Interactions Endpoint URL empty; this bot uses the Gateway.
-3. Copy the **Application ID** from General Information. Enable Discord's Developer Mode (User Settings → Advanced), then right-click your server and copy its ID.
+3. Copy the **Application ID** from General Information.
 4. Make a local environment file without sharing the token in chat or Git:
 
    ```sh
@@ -30,15 +30,15 @@ Role DMs include the game ID, role, team, and allowed starting information. Name
    chmod 600 discord-bot/.env
    ```
 
-   Edit `discord-bot/.env` and fill in `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_GUILD_ID`. The file is ignored by Git.
-5. Register the commands in that server, then run the bot:
+   Edit `discord-bot/.env` and fill in `DISCORD_TOKEN` and `DISCORD_APPLICATION_ID`. The file is ignored by Git.
+5. Register the global commands, then run the bot:
 
    ```sh
    npm --prefix discord-bot run register
    npm run start:bot
    ```
 
-Registration updates only `/avalon` in the configured server. Repeat registration with another server ID to make the bot usable there. It is deliberately not registered globally during development. Only run one bot process against a given state file; stop the local bot before activating production.
+Registration updates only the global `/avalon` command, available in servers where the bot is installed. Register once, and rerun when command definitions change; adding another server does not require registration. Commands are restricted to servers, not DMs. Server administrators can restrict command access under Server Settings → Integrations. Only run one bot process against a given state file; stop the local bot before activating production.
 
 ## Persistence and tests
 
